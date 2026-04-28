@@ -6,6 +6,7 @@ Todas as versoes oficiais deste projeto sao publicadas por tag Git e GitHub Rele
 
 - Adicionado modo `--self-test`, que valida funções internas, comandos essenciais, parsing de configuração, sanitização de texto, escape JSON e detecção básica de ambiente sem instalar nada.
 - Adicionado modo `--collect-support-bundle`, que gera um pacote `.tar.gz` em `/root` com resumo da instalacao, erro estruturado, Doctor, logs limitados, status de servicos, portas, pacotes e configuracoes relacionadas.
+- Corrigida reinstalação da camada DB quando o pacote PostgreSQL já existe, mas o cluster/configuração `/etc/postgresql/<versao>/main` não existe ou ficou parcial após testes anteriores.
 - README reorganizado como página principal do projeto, com requisitos, instalação rápida, features, screenshots planejados, política de versionamento e licença.
 - Adicionada licença MIT.
 

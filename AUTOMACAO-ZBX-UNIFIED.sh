@@ -2567,7 +2567,10 @@ db)
         local escaped_value="${value//\\/\\\\}"
         escaped_value="${escaped_value//&/\\&}"
         escaped_value="${escaped_value//|/\\|}"
-        if [ ! -f "$file" ]; then echo "${param} = ${value}" >> "$file"; return; fi
+        if [ ! -f "$file" ]; then
+            echo "Arquivo de configuração PostgreSQL não encontrado: ${file}" >&2
+            return 1
+        fi
         if grep -qE "^[[:space:]]*${param}[[:space:]]*=" "$file"; then
             sed -i "s|^[[:space:]]*${param}[[:space:]]*=.*|${param} = ${escaped_value}|" "$file"
         elif grep -qE "^#[[:space:]]*${param}[[:space:]]*=" "$file"; then
@@ -2612,6 +2615,7 @@ db)
     PG_MAX_CONN="200"; PG_SHARED_BUF="256MB"; PG_WORK_MEM="8MB"
     PG_MAINT_MEM="128MB"; PG_EFF_CACHE="768MB"; PG_WAL_BUFS="16MB"
     PG_CKPT="0.9"; PG_STATS="100"; PG_RAND_COST="1.1"
+    PG_CLUSTER_NAME="main"; PG_CONF_FILE=""; PG_HBA_FILE=""
     DB_TIMEZONE="${SYS_TIMEZONE:-America/Sao_Paulo}"
 
     # Detectar IP local primário para listen_addresses (apenas a interface de saída)
@@ -3126,13 +3130,71 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
             apt-get install "${APT_FLAGS[@]}" "timescaledb-2-postgresql-${PG_VER}"
     fi
 
+    ensure_postgres_cluster() {
+        local detected cluster_conf cluster_hba cluster_list
+        detected=""
+        if command -v pg_lsclusters >/dev/null 2>&1; then
+            cluster_list="$(timeout 10 pg_lsclusters --no-header 2>/dev/null || true)"
+            detected="$(awk -v v="$PG_VER" '$1==v {print $2; exit}' <<<"$cluster_list" 2>/dev/null || true)"
+        fi
+
+        if [[ -z "$detected" ]]; then
+            if ! command -v pg_createcluster >/dev/null 2>&1; then
+                echo "Comando pg_createcluster não encontrado. Reinstale postgresql-common/postgresql-${PG_VER}." >&2
+                return 1
+            fi
+            if [[ -d "/etc/postgresql/${PG_VER}/main" || -d "/var/lib/postgresql/${PG_VER}/main" ]]; then
+                if [[ "$CLEAN_INSTALL" == "1" ]]; then
+                    echo -e "  ${AMARELO}Restos de cluster PostgreSQL ${PG_VER}/main encontrados após limpeza; removendo para recriar.${RESET}"
+                    rm -rf "/etc/postgresql/${PG_VER}/main" "/var/lib/postgresql/${PG_VER}/main" "/var/log/postgresql/postgresql-${PG_VER}-main.log"
+                else
+                    echo "Restos de cluster PostgreSQL ${PG_VER}/main encontrados, mas nenhum cluster válido foi listado por pg_lsclusters." >&2
+                    echo "Para proteger dados existentes, o instalador não apagou esses diretórios sem confirmação de limpeza." >&2
+                    echo "Rode novamente escolhendo instalação limpa/limpeza da camada DB para apagar e recriar tudo." >&2
+                    return 1
+                fi
+            fi
+            echo -e "  ${AMARELO}Cluster PostgreSQL ${PG_VER}/main não encontrado; criando cluster padrão.${RESET}"
+            timeout 90 pg_createcluster --start "$PG_VER" main >/dev/null
+            detected="main"
+        fi
+
+        PG_CLUSTER_NAME="$detected"
+        PG_CONF_FILE="/etc/postgresql/${PG_VER}/${PG_CLUSTER_NAME}/postgresql.conf"
+        PG_HBA_FILE="/etc/postgresql/${PG_VER}/${PG_CLUSTER_NAME}/pg_hba.conf"
+        cluster_conf="$PG_CONF_FILE"
+        cluster_hba="$PG_HBA_FILE"
+
+        if [[ ! -f "$cluster_conf" || ! -f "$cluster_hba" ]]; then
+            echo "Cluster PostgreSQL ${PG_VER}/${PG_CLUSTER_NAME} existe, mas os arquivos de configuração não foram encontrados:" >&2
+            echo "  ${cluster_conf}" >&2
+            echo "  ${cluster_hba}" >&2
+            echo "Execute uma limpeza DB pelo instalador ou recrie o cluster PostgreSQL antes de continuar." >&2
+            return 1
+        fi
+
+        if command -v pg_ctlcluster >/dev/null 2>&1; then
+            timeout 30 pg_ctlcluster "$PG_VER" "$PG_CLUSTER_NAME" start 2>/dev/null || true
+        fi
+        timeout 20 systemctl start "postgresql@${PG_VER}-${PG_CLUSTER_NAME}" 2>/dev/null || \
+            timeout 20 systemctl start postgresql 2>/dev/null || true
+
+        echo -e "  ${VERDE}Cluster PostgreSQL ativo/validado: ${PG_VER}/${PG_CLUSTER_NAME}${RESET}"
+        echo -e "  ${CIANO}Config:${RESET} ${PG_CONF_FILE}"
+    }
+    run_step "Validando/criando cluster PostgreSQL ${PG_VER}" ensure_postgres_cluster
+
     if [[ "$TSDB_AVAILABLE" == "0" ]]; then
         # Sem TimescaleDB — não adiciona shared_preload_libraries
         true
     else
         set_preload_manual() {
-            local PG_CONF="/etc/postgresql/${PG_VER}/main/postgresql.conf"
+            local PG_CONF="${PG_CONF_FILE:-/etc/postgresql/${PG_VER}/${PG_CLUSTER_NAME}/postgresql.conf}"
             local lib="timescaledb"
+            if [[ ! -f "$PG_CONF" ]]; then
+                echo "Arquivo postgresql.conf não encontrado para TimescaleDB: ${PG_CONF}" >&2
+                return 1
+            fi
             if grep -qE "^[[:space:]]*shared_preload_libraries[[:space:]]*=.*${lib}" "$PG_CONF" 2>/dev/null; then
                 return 0
             elif grep -qE "^[[:space:]]*shared_preload_libraries[[:space:]]*=" "$PG_CONF" 2>/dev/null; then
@@ -3146,7 +3208,7 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
         run_tsdb_tune() {
             TSDB_TUNE_STATUS="não executado"
             # Garante que o PostgreSQL está iniciado antes do tune
-            timeout 20 systemctl start "postgresql@${PG_VER}-main" 2>/dev/null || \
+            timeout 20 systemctl start "postgresql@${PG_VER}-${PG_CLUSTER_NAME}" 2>/dev/null || \
                 timeout 20 systemctl start postgresql 2>/dev/null || true
             # Tenta timescaledb-tune. Se falhar por qualquer razão (ambiente,
             # restrições de recursos, etc.) aplica shared_preload_libraries
@@ -3171,7 +3233,7 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
     fi
 
     configure_postgres() {
-        local PG_CONF="/etc/postgresql/${PG_VER}/main/postgresql.conf"
+        local PG_CONF="${PG_CONF_FILE:-/etc/postgresql/${PG_VER}/${PG_CLUSTER_NAME}/postgresql.conf}"
         set_pg_config "$PG_CONF" "listen_addresses" "$PG_LISTEN_ADDR"
         set_pg_config "$PG_CONF" "timezone" "'${DB_TIMEZONE}'"
         # max_connections é sempre aplicado — configurado como questão independente
@@ -3190,7 +3252,11 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
     run_step "Configurando postgresql.conf (listen_addresses + tuning)" configure_postgres
 
     configure_pg_hba() {
-        local PG_HBA="/etc/postgresql/${PG_VER}/main/pg_hba.conf"
+        local PG_HBA="${PG_HBA_FILE:-/etc/postgresql/${PG_VER}/${PG_CLUSTER_NAME}/pg_hba.conf}"
+        if [[ ! -f "$PG_HBA" ]]; then
+            echo "Arquivo pg_hba.conf não encontrado: ${PG_HBA}" >&2
+            return 1
+        fi
         sed -i "/^host[[:space:]]\+${DB_NAME}[[:space:]]\+${DB_USER}/d" "$PG_HBA" 2>/dev/null || true
         for entry in "${ZBX_SERVER_IPS[@]}"; do
             if [[ "$entry" == "0.0.0.0" || "$entry" == "0.0.0.0/0" ]]; then
@@ -3204,7 +3270,15 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
         done
     }
     run_step "Configurando pg_hba.conf (acesso remoto para ${#ZBX_SERVER_IPS[@]} entrada(s))" configure_pg_hba
-    run_step "Reiniciando PostgreSQL ${PG_VER}" systemctl restart postgresql
+    restart_postgres_cluster() {
+        if command -v pg_ctlcluster >/dev/null 2>&1; then
+            timeout 45 pg_ctlcluster "$PG_VER" "$PG_CLUSTER_NAME" restart
+        else
+            timeout 45 systemctl restart "postgresql@${PG_VER}-${PG_CLUSTER_NAME}" 2>/dev/null || \
+                timeout 45 systemctl restart postgresql
+        fi
+    }
+    run_step "Reiniciando PostgreSQL ${PG_VER}/${PG_CLUSTER_NAME}" restart_postgres_cluster
     wait_for_service_active postgresql 30
 
     create_db_and_user() {
@@ -3243,7 +3317,7 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
     else
         echo -e "\n  ${AMARELO}ℹ TimescaleDB não instalado — extensão ignorada.${RESET}"
     fi
-    run_step "Reiniciando PostgreSQL (configuração final)" systemctl restart postgresql
+    run_step "Reiniciando PostgreSQL ${PG_VER}/${PG_CLUSTER_NAME} (configuração final)" restart_postgres_cluster
     wait_for_service_active postgresql 30
 
     AG_F="/etc/zabbix/zabbix_agent2.conf"
@@ -3303,8 +3377,8 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
     [[ "$_CRITICAL_SERVICES_OK" != "1" ]] && \
         echo -e "${VERMELHO}${NEGRITO}⚠ UM OU MAIS SERVIÇOS CRÍTICOS NÃO ESTÃO ATIVOS. Verifique acima e execute: journalctl -xe --no-pager${RESET}\n"
     HOST_IP=$(hostname -I | awk '{print $1}')
-    PG_CONF="/etc/postgresql/${PG_VER}/main/postgresql.conf"
-    PG_HBA="/etc/postgresql/${PG_VER}/main/pg_hba.conf"
+    PG_CONF="${PG_CONF_FILE:-/etc/postgresql/${PG_VER}/${PG_CLUSTER_NAME}/postgresql.conf}"
+    PG_HBA="${PG_HBA_FILE:-/etc/postgresql/${PG_VER}/${PG_CLUSTER_NAME}/pg_hba.conf}"
     echo -e "${VERDE}${NEGRITO}╔══════════════════════════════════════════════════════════╗${RESET}"
     echo -e "${VERDE}${NEGRITO}║           CERTIFICADO — CAMADA DE BASE DE DADOS          ║${RESET}"
     echo -e "${VERDE}${NEGRITO}╚══════════════════════════════════════════════════════════╝${RESET}"
