@@ -4,6 +4,7 @@ Todas as versoes oficiais deste projeto sao publicadas por tag Git e GitHub Rele
 
 **main - apos v5.5**
 
+- Corrigidas chamadas internas ao PostgreSQL em Debian mínimo: o instalador não depende mais de `sudo -u postgres`; quando executado como root usa `runuser` e mantém `sudo` apenas como fallback.
 - Corrigida geração de locales em Debian mínimo: `en_US.UTF-8` e `pt_BR.UTF-8` agora são habilitados em `/etc/locale.gen` antes do `locale-gen`, e falha de locale vira aviso em vez de abortar a instalação.
 - Troca de fuso horário agora usa menu validado com opções prontas (`America/Sao_Paulo`, `UTC`, manter detectado ou outro fuso validado), evitando erro por digitação incorreta.
 - Corrigido pré-check em Debian/instalação mínima: `curl` não bloqueia mais a instalação quando `wget` existe para bootstrap; `curl` continua sendo instalado nas dependências base antes das etapas que precisam dele.

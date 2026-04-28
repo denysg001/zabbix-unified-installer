@@ -44,6 +44,48 @@ safe_diag_cmd() {
     timeout 10 "$@" 2>/dev/null || true
 }
 
+as_user() {
+    local user="$1"
+    shift
+    if [[ "$(id -un 2>/dev/null || true)" == "$user" ]]; then
+        "$@"
+    elif [[ "$EUID" -eq 0 ]]; then
+        runuser -u "$user" -- "$@"
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo -u "$user" "$@"
+    else
+        echo "Permissão insuficiente: execute como root ou instale sudo para alternar para ${user}." >&2
+        return 127
+    fi
+}
+
+postgres_cmd() {
+    as_user postgres "$@"
+}
+
+postgres_psql() {
+    postgres_cmd psql "$@"
+}
+
+postgres_psql_timeout() {
+    local timeout_s="$1"
+    shift
+    timeout "$timeout_s" bash -c '
+        user="$1"
+        shift
+        if [[ "$(id -un 2>/dev/null || true)" == "$user" ]]; then
+            exec "$@"
+        elif [[ "$EUID" -eq 0 ]]; then
+            exec runuser -u "$user" -- "$@"
+        elif command -v sudo >/dev/null 2>&1; then
+            exec sudo -u "$user" "$@"
+        else
+            echo "Permissão insuficiente: execute como root ou instale sudo." >&2
+            exit 127
+        fi
+    ' _ postgres psql "$@"
+}
+
 print_file_guide() {
     local context="${1:-geral}"
     echo -e "\n${CIANO}${NEGRITO}▸ ONDE CONFERIR DEPOIS${RESET}"
@@ -2514,7 +2556,7 @@ run_doctor_mode() {
                     echo -e "  ${AMARELO}⚠${RESET} PSK não configurado"
             fi
             if type -P psql >/dev/null 2>&1; then
-                safe_diag_cmd sudo -u postgres psql -tAc "SELECT version();" | sed 's/^/  PostgreSQL: /' || true
+                safe_diag_cmd postgres_psql -tAc "SELECT version();" | sed 's/^/  PostgreSQL: /' || true
                 echo -e "\n${CIANO}${NEGRITO}▸ TIMESCALEDB${RESET}"
                 local tsdb_info tsdb_db
                 # Determina o nome da BD: lê do zabbix_server.conf se existir, senão usa "zabbix"
@@ -2523,7 +2565,7 @@ run_doctor_mode() {
                     tsdb_db=$(timeout 10 awk -F'=' '/^DBName[[:space:]]*=/{gsub(/[[:space:]]/,"",$2); print $2}' \
                         /etc/zabbix/zabbix_server.conf 2>/dev/null | head -1 || true)
                 [[ -z "$tsdb_db" ]] && tsdb_db="zabbix"
-                tsdb_info=$(safe_diag_cmd sudo -u postgres psql -d "$tsdb_db" -tAc \
+                tsdb_info=$(safe_diag_cmd postgres_psql -d "$tsdb_db" -tAc \
                     "SELECT extname || ' ' || extversion FROM pg_extension WHERE extname='timescaledb';" \
                     | xargs || true)
                 if [[ -n "$tsdb_info" ]]; then
@@ -3466,18 +3508,18 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
         DB_PASS_SQL=$(sql_quote_literal "$DB_PASS")
         DB_USER_IDENT=$(sql_quote_ident "$DB_USER")
         DB_NAME_IDENT=$(sql_quote_ident "$DB_NAME")
-        timeout 45 sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" \
+        postgres_psql_timeout 45 -tc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" \
             | awk '$1==1{found=1} END{exit !found}' 2>/dev/null || \
-            timeout 45 sudo -u postgres psql -c "CREATE USER ${DB_USER_IDENT} WITH PASSWORD ${DB_PASS_SQL};"
-        timeout 45 sudo -u postgres psql -c "ALTER USER ${DB_USER_IDENT} WITH PASSWORD ${DB_PASS_SQL};"
-        timeout 45 sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" \
+            postgres_psql_timeout 45 -c "CREATE USER ${DB_USER_IDENT} WITH PASSWORD ${DB_PASS_SQL};"
+        postgres_psql_timeout 45 -c "ALTER USER ${DB_USER_IDENT} WITH PASSWORD ${DB_PASS_SQL};"
+        postgres_psql_timeout 45 -tc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" \
             | awk '$1==1{found=1} END{exit !found}' 2>/dev/null || \
-            timeout 45 sudo -u postgres psql -c "CREATE DATABASE ${DB_NAME_IDENT} OWNER ${DB_USER_IDENT} ENCODING 'UTF8' \
+            postgres_psql_timeout 45 -c "CREATE DATABASE ${DB_NAME_IDENT} OWNER ${DB_USER_IDENT} ENCODING 'UTF8' \
                 LC_COLLATE='en_US.UTF-8' LC_CTYPE='en_US.UTF-8' TEMPLATE template0;"
-        timeout 45 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME_IDENT} TO ${DB_USER_IDENT};"
-        timeout 45 sudo -u postgres psql -d "${DB_NAME}" -c "GRANT ALL ON SCHEMA public TO ${DB_USER_IDENT};"
-        timeout 45 sudo -u postgres psql -d "${DB_NAME}" -c "ALTER SCHEMA public OWNER TO ${DB_USER_IDENT};"
-        timeout 45 sudo -u postgres psql -d "${DB_NAME}" -c \
+        postgres_psql_timeout 45 -c "GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME_IDENT} TO ${DB_USER_IDENT};"
+        postgres_psql_timeout 45 -d "${DB_NAME}" -c "GRANT ALL ON SCHEMA public TO ${DB_USER_IDENT};"
+        postgres_psql_timeout 45 -d "${DB_NAME}" -c "ALTER SCHEMA public OWNER TO ${DB_USER_IDENT};"
+        postgres_psql_timeout 45 -d "${DB_NAME}" -c \
             "ALTER DATABASE ${DB_NAME_IDENT} SET timezone TO '${DB_TIMEZONE}';"
     }
     run_step "Criando utilizador '${DB_USER}' e base de dados '${DB_NAME}'" create_db_and_user
@@ -3486,9 +3528,9 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
         enable_timescaledb() {
             local DB_NAME_IDENT
             DB_NAME_IDENT=$(sql_quote_ident "$DB_NAME")
-            timeout 45 sudo -u postgres psql -d "${DB_NAME}" -c \
+            postgres_psql_timeout 45 -d "${DB_NAME}" -c \
                 "ALTER DATABASE ${DB_NAME_IDENT} SET timescaledb.telemetry_level=off;"
-            timeout 45 sudo -u postgres psql -d "${DB_NAME}" -c \
+            postgres_psql_timeout 45 -d "${DB_NAME}" -c \
                 "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"
         }
         run_step "Ativando extensão TimescaleDB na BD '${DB_NAME}'" enable_timescaledb
@@ -3575,7 +3617,7 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
     PG_SVC_NAME="postgresql"
     ! systemctl is-active --quiet postgresql 2>/dev/null && PG_SVC_NAME="postgresql@${PG_VER}-main"
     if systemctl is-active --quiet "$PG_SVC_NAME" 2>/dev/null; then
-        PG_BIN_VER_OUT=$(timeout 10 sudo -u postgres psql --version 2>/dev/null | head -1 || echo "")
+        PG_BIN_VER_OUT=$(postgres_psql_timeout 10 --version 2>/dev/null | head -1 || echo "")
         printf "  %-34s ${VERDE}%s${RESET}\n" "postgresql:" "ATIVO ✔${PG_BIN_VER_OUT:+  ($PG_BIN_VER_OUT)}"
     else
         printf "  %-34s ${VERMELHO}%s${RESET}\n" "postgresql:" "FALHOU ✖"
@@ -3588,7 +3630,7 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
     echo -e "\n${CIANO}${NEGRITO}▸ VERSÕES DOS PACOTES INSTALADOS${RESET}"
     PG_PKG_VER=$(dpkg -l "postgresql-${PG_VER}" 2>/dev/null | awk '/^ii/{print $3}' | head -1 || echo "N/D")
     TSDB_PKG_VER=$(dpkg -l "timescaledb-2-postgresql-${PG_VER}" 2>/dev/null | awk '/^ii/{print $3}' | head -1 || echo "N/D")
-    TSDB_EXT_VER=$(timeout 45 sudo -u postgres psql -d "${DB_NAME}" -tAc \
+    TSDB_EXT_VER=$(postgres_psql_timeout 45 -d "${DB_NAME}" -tAc \
         "SELECT extversion FROM pg_extension WHERE extname='timescaledb';" 2>/dev/null | xargs || echo "N/D")
     printf "  %-34s %s\n" "postgresql-${PG_VER} (pacote):" "${PG_PKG_VER}"
     printf "  %-34s %s\n" "timescaledb-2-postgresql-${PG_VER}:" "${TSDB_PKG_VER}"
