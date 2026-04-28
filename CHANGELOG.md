@@ -9,6 +9,7 @@ Primeira versao oficial publicada no repositorio `denysg001/zabbix-unified-insta
 Baseada no instalador unificado `v5.4`, com:
 
 - arquivo principal `AUTOMACAO-ZBX-UNIFIED.sh`;
+- versionamento oficial por tag Git e GitHub Release;
 - suporte a Database, Server e Proxy;
 - Ubuntu/Debian;
 - PostgreSQL;
@@ -21,4 +22,3 @@ Baseada no instalador unificado `v5.4`, com:
 - sanitizacao do arquivo plain para uso seguro com `cat`;
 - fallback para `timescaledb-tune`;
 - tag Git `v5.4`.
-

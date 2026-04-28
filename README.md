@@ -14,7 +14,7 @@ AUTOMACAO-ZBX-UNIFIED.sh
 
 Este e o unico arquivo que deve receber desenvolvimento normal.
 
-A pasta `releases/` pode existir apenas como copia empacotada/opcional de uma versao publicada. Ela nao deve virar fonte principal e nao deve receber logica diferente.
+Nao ha necessidade de manter copias do script dentro do repositorio para versionar releases. Versoes oficiais devem ser recuperadas por tags Git e GitHub Releases.
 
 ## Latest vs Versao Fixa
 
@@ -123,9 +123,8 @@ Regras:
 - Nao sobrescrever release antiga.
 - Nao alterar tag ja publicada.
 - Nao duplicar logica entre arquivos.
-- Se existir arquivo em `releases/`, ele deve ser copia exata da versao tagueada.
+- Nao usar copias em `releases/` como fonte de versoes; a fonte oficial e sempre `AUTOMACAO-ZBX-UNIFIED.sh` na tag desejada.
 
 ## Releases Publicadas
 
 - `v5.4`: primeira versao oficial publicada neste repositorio.
-
