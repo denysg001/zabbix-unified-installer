@@ -1,24 +1,61 @@
 # Zabbix Unified Installer
 
-Instalador Bash unico para Zabbix Database, Server e Proxy, com suporte a Ubuntu/Debian, PostgreSQL, TimescaleDB opcional e Agent 2.
+Instalador Bash unico para Zabbix Database, Server e Proxy.
 
-## Arquivo principal
+O objetivo deste repositorio e ser a fonte oficial do instalador, com historico limpo, versoes rastreaveis por Git e releases confiaveis.
 
-Use e edite sempre este arquivo:
+## Fonte da Verdade
 
-```bash
-./AUTOMACAO-ZBX-UNIFIED.sh
+O arquivo principal e:
+
+```text
+AUTOMACAO-ZBX-UNIFIED.sh
 ```
 
-O historico de alteracoes deve ficar no Git/GitHub. Versoes publicadas ficam em tags, por exemplo `v5.4`.
+Este e o unico arquivo que deve receber desenvolvimento normal.
 
-## Como executar
+A pasta `releases/` pode existir apenas como copia empacotada/opcional de uma versao publicada. Ela nao deve virar fonte principal e nao deve receber logica diferente.
+
+## Latest vs Versao Fixa
+
+Use `main` quando quiser a versao mais recente em desenvolvimento:
+
+```text
+https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/main/AUTOMACAO-ZBX-UNIFIED.sh
+```
+
+Use uma tag quando quiser uma versao fixa e reproduzivel:
+
+```text
+https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/v5.4/AUTOMACAO-ZBX-UNIFIED.sh
+```
+
+Regra operacional:
+
+- `main`: pode receber correcoes novas.
+- `vX.Y`: nao muda depois de publicada.
+
+## Instalacao via Curl
+
+Latest:
 
 ```bash
+curl -fsSL -o AUTOMACAO-ZBX-UNIFIED.sh \
+  https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/main/AUTOMACAO-ZBX-UNIFIED.sh
+chmod +x AUTOMACAO-ZBX-UNIFIED.sh
 sudo ./AUTOMACAO-ZBX-UNIFIED.sh
 ```
 
-Modos diretos:
+Versao fixa:
+
+```bash
+curl -fsSL -o AUTOMACAO-ZBX-UNIFIED.sh \
+  https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/v5.4/AUTOMACAO-ZBX-UNIFIED.sh
+chmod +x AUTOMACAO-ZBX-UNIFIED.sh
+sudo ./AUTOMACAO-ZBX-UNIFIED.sh
+```
+
+## Modos Diretos
 
 ```bash
 sudo ./AUTOMACAO-ZBX-UNIFIED.sh db
@@ -32,7 +69,7 @@ Diagnostico:
 sudo ./AUTOMACAO-ZBX-UNIFIED.sh server --doctor-export
 ```
 
-## Arquivos importantes no host instalado
+## Arquivos Importantes no Host Instalado
 
 Se der erro fatal, abra primeiro:
 
@@ -53,11 +90,42 @@ Quando rodar o Doctor exportado:
 cat /root/zabbix_doctor_report.txt
 ```
 
-## Releases
+## Politica de Versionamento
 
-A pasta `releases/` guarda copias congeladas das versoes publicadas. O desenvolvimento normal deve acontecer no arquivo principal `AUTOMACAO-ZBX-UNIFIED.sh`.
+O versionamento oficial acontece por:
 
-Versao inicial deste repositorio:
+- commits no Git;
+- tags, como `v5.4`, `v5.5`;
+- GitHub Releases.
 
-- `v5.4`
+Para publicar uma versao estavel:
+
+1. Atualizar `INSTALLER_VERSION` dentro de `AUTOMACAO-ZBX-UNIFIED.sh`.
+2. Atualizar o changelog no script e em `CHANGELOG.md`.
+3. Validar com:
+
+```bash
+bash -n AUTOMACAO-ZBX-UNIFIED.sh
+```
+
+4. Criar commit.
+5. Criar tag, por exemplo:
+
+```bash
+git tag v5.5
+```
+
+6. Publicar a tag no GitHub.
+7. Criar um GitHub Release para a tag.
+
+Regras:
+
+- Nao sobrescrever release antiga.
+- Nao alterar tag ja publicada.
+- Nao duplicar logica entre arquivos.
+- Se existir arquivo em `releases/`, ele deve ser copia exata da versao tagueada.
+
+## Releases Publicadas
+
+- `v5.4`: primeira versao oficial publicada neste repositorio.
 
