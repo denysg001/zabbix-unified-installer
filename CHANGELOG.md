@@ -1,12 +1,12 @@
-# Changelog
+## Changelog
 
 Todas as versoes oficiais deste projeto sao publicadas por tag Git e GitHub Release.
 
-## main - v5.5-dev
+**main - v5.5-dev**
 
 - Adicionado modo `--collect-support-bundle`, que gera um pacote `.tar.gz` em `/root` com resumo da instalacao, erro estruturado, Doctor, logs limitados, status de servicos, portas, pacotes e configuracoes relacionadas.
 
-## v5.4 - 2026-04-28
+**v5.4 - 2026-04-28**
 
 Primeira versao oficial publicada no repositorio `denysg001/zabbix-unified-installer`.
 
@@ -27,8 +27,10 @@ Baseada no instalador unificado `v5.4`, com:
 - fallback para `timescaledb-tune`;
 - tag Git `v5.4`.
 
-## Historico legado anterior ao repositorio GitHub
+<details>
+<summary><strong>Historico legado anterior ao repositorio GitHub</strong></summary>
 
+```text
   v5.3 — 2026-04-27
         [GERAL] Adicionado --list-supported-os, com matriz clara de sistemas
           suportados, experimentais e indisponíveis.
@@ -787,3 +789,6 @@ Baseada no instalador unificado `v5.4`, com:
           helpers de sistema e execução por etapas; os componentes ficavam em
           branches case independentes para facilitar evolução sem duplicar o
           esqueleto do instalador.
+```
+
+</details>
