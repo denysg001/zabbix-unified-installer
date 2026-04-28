@@ -568,6 +568,67 @@ auto_repair_apt() {
     apt-get install -f -y 2>/dev/null | { [[ -n "${LOG_FILE:-}" ]] && tee -a "$LOG_FILE" || cat; } 2>/dev/null || true
 }
 
+validate_timezone_name() {
+    local tz="$1"
+    [[ -n "$tz" ]] || return 1
+    [[ "$tz" == *".."* || "$tz" == /* ]] && return 1
+    if command -v timedatectl >/dev/null 2>&1; then
+        timedatectl list-timezones 2>/dev/null | grep -Fx -- "$tz" >/dev/null 2>&1 && return 0
+    fi
+    [[ "$tz" == "UTC" ]] && return 0
+    [[ -f "/usr/share/zoneinfo/${tz}" ]]
+}
+
+select_timezone_value() {
+    local current="$1" context="$2" opt custom_tz
+    [[ -z "$current" ]] && current="America/Sao_Paulo"
+    echo -e "\n${CIANO}${NEGRITO}>>> FUSO HORÁRIO DO SISTEMA <<<${RESET}" >&2
+    echo -e "  Fuso atual/detectado: ${NEGRITO}${current}${RESET}" >&2
+    echo -e "  ${AMARELO}${context}${RESET}" >&2
+    echo -e "\n  1) America/Sao_Paulo (Brasil)" >&2
+    echo -e "  2) UTC" >&2
+    echo -e "  3) Manter detectado (${current})" >&2
+    echo -e "  4) Outro fuso validado" >&2
+    while true; do
+        read -rp "  Escolha (1, 2, 3 ou 4): " opt
+        case "$opt" in
+            1) printf '%s\n' "America/Sao_Paulo"; return 0 ;;
+            2) printf '%s\n' "UTC"; return 0 ;;
+            3|"") printf '%s\n' "$current"; return 0 ;;
+            4)
+                while true; do
+                    read -rp "   Novo fuso (ex: America/Sao_Paulo, Europe/Lisbon, UTC): " custom_tz
+                    if validate_timezone_name "$custom_tz"; then
+                        printf '%s\n' "$custom_tz"
+                        return 0
+                    fi
+                    echo -e "   ${VERMELHO}Fuso inválido ou não encontrado neste sistema.${RESET}" >&2
+                done
+                ;;
+            *) echo -e "  ${VERMELHO}Opção inválida.${RESET}" >&2 ;;
+        esac
+    done
+}
+
+ensure_utf8_locales() {
+    if [[ -f /etc/locale.gen ]]; then
+        grep -qE '^[# ]*en_US\.UTF-8 UTF-8' /etc/locale.gen 2>/dev/null && \
+            sed -i 's/^[# ]*en_US\.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
+        grep -qE '^[# ]*pt_BR\.UTF-8 UTF-8' /etc/locale.gen 2>/dev/null && \
+            sed -i 's/^[# ]*pt_BR\.UTF-8 UTF-8/pt_BR.UTF-8 UTF-8/' /etc/locale.gen
+        grep -qE '^en_US\.UTF-8 UTF-8' /etc/locale.gen 2>/dev/null || echo 'en_US.UTF-8 UTF-8' >> /etc/locale.gen
+        grep -qE '^pt_BR\.UTF-8 UTF-8' /etc/locale.gen 2>/dev/null || echo 'pt_BR.UTF-8 UTF-8' >> /etc/locale.gen
+    fi
+    locale-gen en_US.UTF-8 pt_BR.UTF-8 2>/dev/null || locale-gen 2>/dev/null || true
+    if locale -a 2>/dev/null | grep -qiE '^en_US\.(utf8|UTF-8)$'; then
+        update-locale LANG=en_US.UTF-8 2>/dev/null || true
+    else
+        add_install_warning "Locale en_US.UTF-8 não pôde ser ativado automaticamente; instalação continuará."
+        log_msg "WARN" "Locale en_US.UTF-8 não pôde ser ativado automaticamente; instalação continuará."
+    fi
+    return 0
+}
+
 # set_config: formato param=value (Zabbix conf)
 # Valor vazio → comenta a linha (Zabbix 7.4 rejeita "param=" mesmo vazio)
 set_config() {
@@ -2984,18 +3045,7 @@ EOF
     }
 
     m_timezone() {
-        echo -e "\n${CIANO}${NEGRITO}>>> FUSO HORÁRIO DO SISTEMA <<<${RESET}"
-        echo -e "  Fuso detetado automaticamente: ${NEGRITO}${DB_TIMEZONE}${RESET}"
-        echo -e "  ${AMARELO}Será aplicado ao PostgreSQL (postgresql.conf) e à base de dados Zabbix.${RESET}"
-        local tz_change
-        ask_yes_no "Alterar o fuso horário?" tz_change
-        if [[ "$tz_change" == "1" ]]; then
-            while true; do
-                read -rp "   Novo fuso (ex: America/Sao_Paulo, Europe/Lisbon, UTC): " DB_TIMEZONE
-                [[ -n "$DB_TIMEZONE" ]] && break
-                echo -e "   ${VERMELHO}Campo obrigatório.${RESET}"
-            done
-        fi
+        DB_TIMEZONE="$(select_timezone_value "$DB_TIMEZONE" "Será aplicado ao PostgreSQL (postgresql.conf) e à base de dados Zabbix.")"
         echo -e "   ${VERDE}Fuso configurado: ${NEGRITO}${DB_TIMEZONE}${RESET}"
     }
 
@@ -3096,11 +3146,7 @@ EOF
     run_step "Instalando dependências base" apt-get install "${APT_FLAGS[@]}" \
         curl wget ca-certificates gnupg apt-transport-https lsb-release locales
 
-    ensure_locale() {
-        locale-gen en_US.UTF-8 pt_BR.UTF-8
-        update-locale LANG=en_US.UTF-8
-    }
-    run_step "Gerando locales en_US.UTF-8 e pt_BR.UTF-8" ensure_locale
+    run_step "Gerando locales en_US.UTF-8 e pt_BR.UTF-8" ensure_utf8_locales
 
     if [[ "$INSTALL_AGENT" == "1" ]]; then
         if [[ "$ZBX_AGENT_VERSION" == "7.4" ]]; then
@@ -4294,18 +4340,7 @@ EOF
     }
 
     m_timezone() {
-        echo -e "\n${CIANO}${NEGRITO}>>> FUSO HORÁRIO DO SISTEMA <<<${RESET}"
-        echo -e "  Fuso detetado automaticamente: ${NEGRITO}${TIMEZONE}${RESET}"
-        echo -e "  ${AMARELO}Será aplicado ao PHP-FPM e ao utilizador Admin do Zabbix.${RESET}"
-        local tz_change
-        ask_yes_no "Alterar o fuso horário?" tz_change
-        if [[ "$tz_change" == "1" ]]; then
-            while true; do
-                read -rp "   Novo fuso (ex: America/Sao_Paulo, Europe/Lisbon, UTC): " TIMEZONE
-                [[ -n "$TIMEZONE" ]] && break
-                echo -e "   ${VERMELHO}Campo obrigatório.${RESET}"
-            done
-        fi
+        TIMEZONE="$(select_timezone_value "$TIMEZONE" "Será aplicado ao PHP-FPM e ao utilizador Admin do Zabbix.")"
         echo -e "   ${VERDE}Fuso configurado: ${NEGRITO}${TIMEZONE}${RESET}"
     }
 
@@ -4492,8 +4527,7 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
     }
     run_step "Validando arquivos de configuração do Zabbix Server" ensure_server_config_files
 
-    run_step "Gerando locales pt_BR.UTF-8 e en_US.UTF-8" bash -c \
-        "locale-gen pt_BR.UTF-8 en_US.UTF-8 && update-locale"
+    run_step "Gerando locales pt_BR.UTF-8 e en_US.UTF-8" ensure_utf8_locales
 
     if [[ "$INSTALL_AGENT" == "1" ]]; then
         install_agent2_pkg() {
@@ -5340,18 +5374,7 @@ EOF
     }
 
     m_timezone() {
-        echo -e "\n${CIANO}${NEGRITO}>>> FUSO HORÁRIO DO SISTEMA <<<${RESET}"
-        echo -e "  Fuso detetado automaticamente: ${NEGRITO}${PROXY_TIMEZONE}${RESET}"
-        echo -e "  ${AMARELO}Será aplicado ao relógio do sistema via timedatectl.${RESET}"
-        local tz_change
-        ask_yes_no "Alterar o fuso horário?" tz_change
-        if [[ "$tz_change" == "1" ]]; then
-            while true; do
-                read -rp "   Novo fuso (ex: America/Sao_Paulo, Europe/Lisbon, UTC): " PROXY_TIMEZONE
-                [[ -n "$PROXY_TIMEZONE" ]] && break
-                echo -e "   ${VERMELHO}Campo obrigatório.${RESET}"
-            done
-        fi
+        PROXY_TIMEZONE="$(select_timezone_value "$PROXY_TIMEZONE" "Será aplicado ao relógio do sistema via timedatectl.")"
         echo -e "   ${VERDE}Fuso configurado: ${NEGRITO}${PROXY_TIMEZONE}${RESET}"
     }
 
