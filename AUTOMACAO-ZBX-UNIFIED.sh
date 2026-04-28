@@ -1922,7 +1922,7 @@ preflight_install_check() {
     print_environment_context
     warn_previous_installation "$component"
     echo -e "\n${CIANO}${NEGRITO}▸ Comandos obrigatórios${RESET}"
-    check_required_commands apt-get apt-cache dpkg systemctl openssl ip awk sed grep gzip
+    check_required_commands apt-get apt-cache dpkg systemctl runuser openssl ip awk sed grep gzip
     check_bootstrap_downloader
     echo -e "\n${CIANO}${NEGRITO}▸ Portas críticas${RESET}"
     case "$component" in
@@ -2116,7 +2116,7 @@ run_self_test() {
             _self_fail "Comando ausente: ${cmd}"
         fi
     done
-    for cmd in timeout apt-get apt-cache dpkg systemctl journalctl ss ip; do
+    for cmd in timeout apt-get apt-cache dpkg systemctl journalctl ss ip runuser; do
         if type -P "$cmd" >/dev/null 2>&1; then
             _self_ok "Comando operacional disponível: ${cmd}"
         elif [[ "$OS_FAMILY" == "ubuntu" || "$OS_FAMILY" == "debian" ]]; then
