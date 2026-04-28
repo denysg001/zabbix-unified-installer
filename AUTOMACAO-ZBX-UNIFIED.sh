@@ -941,6 +941,46 @@ validate_zabbix_identity() {
     fi
 }
 
+local_ipv4_addresses() {
+    {
+        hostname -I 2>/dev/null | tr ' ' '\n' || true
+        if command -v ip >/dev/null 2>&1; then
+            ip -o -4 addr show scope global 2>/dev/null | awk '{sub(/\/.*/, "", $4); print $4}' || true
+        fi
+        primary_ipv4 2>/dev/null || true
+    } | awk '/^([0-9]{1,3}\.){3}[0-9]{1,3}$/ && !seen[$0]++'
+}
+
+is_local_ipv4_address() {
+    local host="$1" local_ip
+    [[ "$host" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
+    for local_ip in $(local_ipv4_addresses); do
+        [[ "$host" == "$local_ip" ]] && return 0
+    done
+    return 1
+}
+
+is_forbidden_active_proxy_target() {
+    local host="$1" resolved_ip
+    host="${host#[}"
+    host="${host%]}"
+    case "$host" in
+        0|0.0.0.0|::|::1|localhost|localhost.localdomain)
+            return 0
+            ;;
+    esac
+    [[ "$host" =~ ^127\. ]] && return 0
+    is_local_ipv4_address "$host" && return 0
+
+    if command -v getent >/dev/null 2>&1; then
+        while read -r resolved_ip; do
+            [[ "$resolved_ip" =~ ^127\. ]] && return 0
+            is_local_ipv4_address "$resolved_ip" && return 0
+        done < <(getent ahostsv4 "$host" 2>/dev/null | awk '{print $1}' | sort -u)
+    fi
+    return 1
+}
+
 validate_proxy_server_value() {
     local value="$1" mode="$2" label="${3:-Server do Proxy}"
     local server_list entry host port
@@ -964,9 +1004,10 @@ validate_proxy_server_value() {
         fi
         host="${host#[}"
         host="${host%]}"
-        if [[ "$host" == "0" || "$host" == "0.0.0.0" || "$host" == "::" ]]; then
+        if is_forbidden_active_proxy_target "$host"; then
             echo -e "   ${VERMELHO}${label} inválido para Proxy ativo: ${entry}${RESET}"
-            echo -e "   Informe o IP/DNS real do Zabbix Server. Exemplo: 10.1.30.111"
+            echo -e "   Informe o IP/DNS real do Zabbix Server, não localhost nem o IP deste Proxy."
+            echo -e "   Exemplo: 10.1.30.111"
             return 1
         fi
         if [[ -n "$port" ]]; then
@@ -1090,7 +1131,9 @@ check_proxy_server_connectivity() {
             host="${entry%:*}"
             port="${entry##*:}"
         fi
-        if [[ "$host" == "0" || "$host" == "0.0.0.0" || "$host" == "::" ]]; then
+        host="${host#[}"
+        host="${host%]}"
+        if is_forbidden_active_proxy_target "$host"; then
             printf "  %-34s ${AMARELO}%s${RESET}\n" "${host}:${port}" "destino inválido para Proxy ativo"
             [[ "${DOCTOR_ACTIVE:-0}" == "1" ]] && DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
             continue
@@ -2247,8 +2290,10 @@ run_self_test() {
     fi
 
     if ! validate_proxy_server_value "0" "0" "Server do Proxy" >/dev/null 2>&1 && \
+       ! validate_proxy_server_value "127.0.0.1" "0" "Server do Proxy" >/dev/null 2>&1 && \
+       ! validate_proxy_server_value "localhost" "0" "Server do Proxy" >/dev/null 2>&1 && \
        validate_proxy_server_value "10.1.30.111" "0" "Server do Proxy" >/dev/null 2>&1; then
-        _self_ok "Proxy ativo rejeita Server=0 e aceita IP real"
+        _self_ok "Proxy ativo rejeita destinos locais e aceita IP real"
     else
         _self_fail "Validação do Server do Proxy ativo falhou"
     fi
