@@ -51,11 +51,19 @@ jobs:
           severity: error
 
   container-test:
-    name: Ubuntu 24.04 smoke test
+    name: Smoke test (${{ matrix.name }})
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: Ubuntu 24.04
+            image: ubuntu:24.04
+          - name: Debian 12
+            image: debian:12
     container:
-      image: ubuntu:24.04
+      image: ${{ matrix.image }}
     env:
       NONINTERACTIVE: "1"
       CI: "1"
