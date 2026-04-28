@@ -4,6 +4,7 @@ Todas as versoes oficiais deste projeto sao publicadas por tag Git e GitHub Rele
 
 **main - apos v5.5**
 
+- Removidos erros ruidosos da configuração de políticas TimescaleDB quando a versão/configuração não aceita compressão/columnstore; políticas ignoradas continuam como aviso limpo.
 - Corrigido falso aviso do Doctor em Debian/Ubuntu: consultas locais ao PostgreSQL agora usam o executor com timeout próprio, sem passar função Bash diretamente para `timeout`.
 - `timescaledb_active` no JSON agora reflete a extensão carregada na base, não apenas a disponibilidade/instalação do pacote.
 - Corrigidas chamadas internas ao PostgreSQL em Debian mínimo: o instalador não depende mais de `sudo -u postgres`; quando executado como root usa `runuser`, valida sua presença no pré-check e mantém `sudo` apenas como fallback.
