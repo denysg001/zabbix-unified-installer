@@ -14,6 +14,9 @@ Todas as versoes oficiais deste projeto sao publicadas por tag Git e GitHub Rele
 - Recuperados conffiles do Server (`zabbix_server.conf` e `nginx.conf`) em reinstalações parciais antes de aplicar configuração.
 - Ajustada configuração opcional de compressão/columnstore TimescaleDB para não despejar erros críticos no log quando a política não é suportada pela combinação instalada.
 - Corrigida contagem de políticas TimescaleDB para diferenciar políticas aplicadas de políticas ignoradas pela versão/configuração atual.
+- Recuperados conffiles do Proxy/Agent em reinstalações parciais antes de aplicar configuração.
+- Separada ativação de `zabbix-proxy` e `zabbix-agent2`, com diagnóstico do serviço no log quando algum deles falhar.
+- Removido uso ativo de `EnableRemoteCommands` no Proxy, evitando parâmetro legado em versões atuais; quando solicitado, usa `AllowKey=system.run[*]`.
 - README reorganizado como página principal do projeto, com requisitos, instalação rápida, features, screenshots planejados, política de versionamento e licença.
 - Adicionada licença MIT.
 

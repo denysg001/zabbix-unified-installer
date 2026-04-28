@@ -5440,8 +5440,31 @@ EOF
     [[ "$INSTALL_AGENT" == "1" ]] && run_step "Instalando Agent 2" \
         apt-get install "${APT_FLAGS[@]}" zabbix-agent2
 
+    ensure_proxy_config_files() {
+        local missing=0
+        apt-get install "${APT_FLAGS[@]}" --reinstall -o Dpkg::Options::="--force-confmiss" zabbix-proxy-sqlite3 >/dev/null
+        if [[ "$INSTALL_AGENT" == "1" ]]; then
+            apt-get install "${APT_FLAGS[@]}" --reinstall -o Dpkg::Options::="--force-confmiss" zabbix-agent2 >/dev/null
+        fi
+        if [[ ! -f /etc/zabbix/zabbix_proxy.conf ]]; then
+            echo "Arquivo /etc/zabbix/zabbix_proxy.conf ausente após reinstalação do pacote." >&2
+            missing=1
+        fi
+        if [[ "$INSTALL_AGENT" == "1" && ! -f /etc/zabbix/zabbix_agent2.conf ]]; then
+            echo "Arquivo /etc/zabbix/zabbix_agent2.conf ausente após reinstalação do pacote." >&2
+            missing=1
+        fi
+        [[ "$missing" == "0" ]]
+    }
+    run_step "Validando arquivos de configuração do Proxy" ensure_proxy_config_files
+
     run_step "Formando estrutura base da DB" mkdir -p /var/lib/zabbix
-    run_step "Protegendo chown do ambiente" chown -R zabbix:zabbix /var/lib/zabbix
+    prepare_proxy_runtime_dirs() {
+        install -d -o zabbix -g zabbix -m 0750 /var/lib/zabbix /var/log/zabbix /run/zabbix
+        rm -f /var/lib/zabbix/zabbix_proxy.db-journal /var/lib/zabbix/zabbix_proxy.db-wal /var/lib/zabbix/zabbix_proxy.db-shm 2>/dev/null || true
+        chown -R zabbix:zabbix /var/lib/zabbix /var/log/zabbix /run/zabbix
+    }
+    run_step "Preparando diretórios runtime do Proxy" prepare_proxy_runtime_dirs
 
     PX_F="/etc/zabbix/zabbix_proxy.conf"
     AG_F="/etc/zabbix/zabbix_agent2.conf"
@@ -5451,7 +5474,8 @@ EOF
         set_config "$PX_F" "Server"    "$ZBX_SERVER"
         set_config "$PX_F" "Hostname"  "$ZBX_HOSTNAME"
         set_config "$PX_F" "DBName"    "/var/lib/zabbix/zabbix_proxy.db"
-        [[ "$ENABLE_REMOTE" == "1" ]] && set_config "$PX_F" "EnableRemoteCommands" "1"
+        set_config "$PX_F" "EnableRemoteCommands" ""
+        [[ "$ENABLE_REMOTE" == "1" ]] && set_config "$PX_F" "AllowKey" "system.run[*]"
         set_config "$PX_F" "CacheSize"        "$T_CACHE"
         set_config "$PX_F" "StartDBSyncers"   "$T_DBSYNC"
         set_config "$PX_F" "HistoryCacheSize" "$T_HCACHE"
@@ -5528,8 +5552,26 @@ EOF
         run_step "Gerando e aplicando chaves PSK independentes" apply_psk
     fi
 
-    run_step "Ativando Daemons (Systemctl enable/start)" bash -c \
-        "systemctl enable --now zabbix-proxy $([[ "$INSTALL_AGENT" == "1" ]] && echo "zabbix-agent2")"
+    start_proxy_service() {
+        systemctl enable zabbix-proxy
+        if ! timeout 30 systemctl restart zabbix-proxy; then
+            echo "Falha ao iniciar zabbix-proxy. Últimas linhas do serviço:" >&2
+            timeout 10 systemctl status zabbix-proxy --no-pager 2>&1 | tail -n 40 >&2 || true
+            timeout 10 journalctl -u zabbix-proxy --no-pager -n 80 2>&1 >&2 || true
+            return 1
+        fi
+    }
+    run_step "Ativando Zabbix Proxy" start_proxy_service
+    start_proxy_agent_service() {
+        systemctl enable zabbix-agent2
+        if ! timeout 30 systemctl restart zabbix-agent2; then
+            echo "Falha ao iniciar zabbix-agent2. Últimas linhas do serviço:" >&2
+            timeout 10 systemctl status zabbix-agent2 --no-pager 2>&1 | tail -n 40 >&2 || true
+            timeout 10 journalctl -u zabbix-agent2 --no-pager -n 80 2>&1 >&2 || true
+            return 1
+        fi
+    }
+    [[ "$INSTALL_AGENT" == "1" ]] && run_step "Ativando Zabbix Agent 2" start_proxy_agent_service
     wait_for_service_active zabbix-proxy 30
     [[ "$INSTALL_AGENT" == "1" ]] && wait_for_service_active zabbix-agent2 30
 
