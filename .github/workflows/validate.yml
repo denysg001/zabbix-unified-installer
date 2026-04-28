@@ -16,24 +16,61 @@ permissions:
 
 jobs:
   validate:
-    name: Bash syntax and ShellCheck
+    name: Validate installer
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
+    env:
+      NONINTERACTIVE: "1"
+      CI: "1"
+      DEBIAN_FRONTEND: noninteractive
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Install ShellCheck
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y shellcheck
-
-      - name: Validate Bash syntax
+      - name: Syntax check
         run: bash -n AUTOMACAO-ZBX-UNIFIED.sh
 
-      - name: Run installer self-test
+      - name: Encoding validation
+        run: |
+          file AUTOMACAO-ZBX-UNIFIED.sh
+          iconv -f UTF-8 -t UTF-8 AUTOMACAO-ZBX-UNIFIED.sh >/dev/null
+          ! grep -P '\r' AUTOMACAO-ZBX-UNIFIED.sh
+
+      - name: Basic execution test
+        run: |
+          chmod +x AUTOMACAO-ZBX-UNIFIED.sh
+          timeout 30s ./AUTOMACAO-ZBX-UNIFIED.sh --help
+
+      - name: Installer self-test
         run: bash AUTOMACAO-ZBX-UNIFIED.sh --self-test
 
-      - name: Run ShellCheck errors
-        run: shellcheck -S error AUTOMACAO-ZBX-UNIFIED.sh
+      - name: ShellCheck validation
+        uses: ludeeus/action-shellcheck@master
+        with:
+          severity: error
+
+  container-test:
+    name: Ubuntu 24.04 smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    container:
+      image: ubuntu:24.04
+    env:
+      NONINTERACTIVE: "1"
+      CI: "1"
+      DEBIAN_FRONTEND: noninteractive
+
+    steps:
+      - name: Install smoke-test dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends bash curl grep sed gawk coreutils git ca-certificates
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Basic execution test
+        run: |
+          chmod +x AUTOMACAO-ZBX-UNIFIED.sh
+          timeout 30s ./AUTOMACAO-ZBX-UNIFIED.sh --help
