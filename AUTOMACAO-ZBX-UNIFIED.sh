@@ -3209,11 +3209,51 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
             fi
         }
 
+        apply_safe_pg_tuning_for_container() {
+            local PG_CONF="${PG_CONF_FILE:-/etc/postgresql/${PG_VER}/${PG_CLUSTER_NAME}/postgresql.conf}"
+            local max_workers ts_workers parallel_workers
+            if [[ ! -f "$PG_CONF" ]]; then
+                echo "Arquivo postgresql.conf não encontrado para tuning seguro: ${PG_CONF}" >&2
+                return 1
+            fi
+            calc_pg_auto_tuning
+            max_workers=$(( CPU_CORES + 4 ))
+            (( max_workers < 8 )) && max_workers=8
+            (( max_workers > 16 )) && max_workers=16
+            ts_workers="$CPU_CORES"
+            (( ts_workers < 2 )) && ts_workers=2
+            (( ts_workers > 8 )) && ts_workers=8
+            parallel_workers="$CPU_CORES"
+            (( parallel_workers < 2 )) && parallel_workers=2
+            (( parallel_workers > 8 )) && parallel_workers=8
+
+            set_pg_config "$PG_CONF" "shared_buffers" "$PG_SHARED_BUF"
+            set_pg_config "$PG_CONF" "effective_cache_size" "$PG_EFF_CACHE"
+            set_pg_config "$PG_CONF" "maintenance_work_mem" "$PG_MAINT_MEM"
+            set_pg_config "$PG_CONF" "work_mem" "$PG_WORK_MEM"
+            set_pg_config "$PG_CONF" "wal_buffers" "$PG_WAL_BUFS"
+            set_pg_config "$PG_CONF" "max_worker_processes" "$max_workers"
+            set_pg_config "$PG_CONF" "timescaledb.max_background_workers" "$ts_workers"
+            set_pg_config "$PG_CONF" "max_parallel_workers" "$parallel_workers"
+            set_pg_config "$PG_CONF" "max_parallel_workers_per_gather" "2"
+            set_pg_config "$PG_CONF" "checkpoint_completion_target" "$PG_CKPT"
+            set_pg_config "$PG_CONF" "default_statistics_target" "$PG_STATS"
+            set_pg_config "$PG_CONF" "random_page_cost" "$PG_RAND_COST"
+        }
+
         run_tsdb_tune() {
             TSDB_TUNE_STATUS="não executado"
             # Garante que o PostgreSQL está iniciado antes do tune
             timeout 20 systemctl start "postgresql@${PG_VER}-${PG_CLUSTER_NAME}" 2>/dev/null || \
                 timeout 20 systemctl start postgresql 2>/dev/null || true
+            if [[ "${_IS_CONTAINER:-0}" == "1" ]]; then
+                TSDB_TUNE_STATUS="ignorado em container/LXC; tuning seguro aplicado pelo instalador"
+                echo -e "  ${AMARELO}⚠ Ambiente de container/LXC detectado — ignorando timescaledb-tune para evitar RAM do host.${RESET}"
+                set_preload_manual || true
+                apply_safe_pg_tuning_for_container || true
+                add_install_warning "timescaledb-tune ignorado em container/LXC; aplicado tuning seguro baseado na RAM detectada (${RAM_MB} MB)."
+                return 0
+            fi
             # Tenta timescaledb-tune. Se falhar por qualquer razão (ambiente,
             # restrições de recursos, etc.) aplica shared_preload_libraries
             # manualmente e continua sem abortar.
@@ -3233,6 +3273,10 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
             run_step "Executando timescaledb-tune (otimização baseada na RAM/CPU)" run_tsdb_tune
         else
             run_step "Configurando shared_preload_libraries = 'timescaledb'" set_preload_manual
+        fi
+        if [[ "${_IS_CONTAINER:-0}" == "1" ]]; then
+            echo -e "  ${CIANO}Normalizando tuning PostgreSQL para limites do container/LXC (${RAM_MB} MB RAM).${RESET}"
+            apply_safe_pg_tuning_for_container || true
         fi
     fi
 
@@ -3282,8 +3326,32 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
                 timeout 45 systemctl restart postgresql
         fi
     }
+    wait_for_postgres_ready() {
+        local timeout_s="${1:-30}" waited=0 cluster_service="postgresql@${PG_VER}-${PG_CLUSTER_NAME}"
+        log_msg "INFO" "Aguardando PostgreSQL ${PG_VER}/${PG_CLUSTER_NAME} responder por até ${timeout_s}s"
+        while (( waited < timeout_s )); do
+            if command -v pg_isready >/dev/null 2>&1 && timeout 5 pg_isready -q -h /var/run/postgresql -p 5432 2>/dev/null; then
+                echo -e "  ${VERDE}✔${RESET} PostgreSQL ${PG_VER}/${PG_CLUSTER_NAME}: pronto após ${waited}s"
+                log_msg "OK" "PostgreSQL ${PG_VER}/${PG_CLUSTER_NAME} pronto após ${waited}s"
+                return 0
+            fi
+            if systemctl is-active --quiet "$cluster_service" 2>/dev/null || systemctl is-active --quiet postgresql 2>/dev/null; then
+                echo -e "  ${VERDE}✔${RESET} PostgreSQL ${PG_VER}/${PG_CLUSTER_NAME}: serviço ativo após ${waited}s"
+                log_msg "OK" "PostgreSQL ${PG_VER}/${PG_CLUSTER_NAME} serviço ativo após ${waited}s"
+                return 0
+            fi
+            sleep 2
+            waited=$(( waited + 2 ))
+        done
+        echo -e "\n${VERMELHO}${NEGRITO}ERRO:${RESET} PostgreSQL ${PG_VER}/${PG_CLUSTER_NAME} não ficou pronto em ${timeout_s}s."
+        echo -e "  Diagnóstico sugerido: journalctl -u ${cluster_service} -n 80 --no-pager"
+        log_msg "ERROR" "PostgreSQL ${PG_VER}/${PG_CLUSTER_NAME} não ficou pronto em ${timeout_s}s"
+        print_service_journal_tail "$cluster_service" 30
+        print_service_journal_tail postgresql 30
+        return 1
+    }
     run_step "Reiniciando PostgreSQL ${PG_VER}/${PG_CLUSTER_NAME}" restart_postgres_cluster
-    wait_for_service_active postgresql 30
+    wait_for_postgres_ready 30
 
     create_db_and_user() {
         validate_identifier "$DB_USER" "Nome do utilizador da BD"
@@ -3322,7 +3390,7 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
         echo -e "\n  ${AMARELO}ℹ TimescaleDB não instalado — extensão ignorada.${RESET}"
     fi
     run_step "Reiniciando PostgreSQL ${PG_VER}/${PG_CLUSTER_NAME} (configuração final)" restart_postgres_cluster
-    wait_for_service_active postgresql 30
+    wait_for_postgres_ready 30
 
     AG_F="/etc/zabbix/zabbix_agent2.conf"
     if [[ "$INSTALL_AGENT" == "1" && ( -f "$AG_F" || "$SIMULATE_MODE" == "1" ) ]]; then
