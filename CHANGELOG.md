@@ -4,6 +4,8 @@ Todas as versoes oficiais deste projeto sao publicadas por tag Git e GitHub Rele
 
 **main - apos v5.5**
 
+- Corrigido pré-check em Debian/instalação mínima: `curl` não bloqueia mais a instalação quando `wget` existe para bootstrap; `curl` continua sendo instalado nas dependências base antes das etapas que precisam dele.
+- README recebeu badges, matriz de compatibilidade e one-liners para `main` e `v5.5`, com exemplos corretos para execução como `root` em Debian mínimo e com `sudo` quando disponível.
 - Adicionado `THIRD_PARTY_NOTICES.md` com avisos de licencas de terceiros, fontes oficiais e orientacao pratica para auditoria dos pacotes instalados no host.
 - README atualizado para separar claramente a licenca MIT do instalador das licencas dos softwares instalados via repositorios oficiais.
 

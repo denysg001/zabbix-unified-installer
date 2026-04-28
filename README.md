@@ -1,6 +1,10 @@
 # Zabbix Unified Installer
 
 [![Validate installer](https://github.com/denysg001/zabbix-unified-installer/actions/workflows/validate.yml/badge.svg)](https://github.com/denysg001/zabbix-unified-installer/actions/workflows/validate.yml)
+[![Latest release](https://img.shields.io/github/v/release/denysg001/zabbix-unified-installer?label=release)](https://github.com/denysg001/zabbix-unified-installer/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Bash](https://img.shields.io/badge/bash-4%2B-4EAA25.svg)](AUTOMACAO-ZBX-UNIFIED.sh)
+[![Ubuntu/Debian](https://img.shields.io/badge/OS-Ubuntu%20%7C%20Debian-blue.svg)](#compatibilidade)
 
 Instalador unificado e resiliente para Zabbix Database, Server e Proxy, com fluxo interativo, instalacao limpa, diagnostico integrado e exports para suporte.
 
@@ -33,10 +37,48 @@ Hardware recomendado:
 
 Permissoes:
 
-- execucao com `root`/`sudo` para instalar, limpar, diagnosticar logs protegidos e gerar bundle em `/root`;
+- execucao como `root` ou via `sudo` para instalar, limpar, diagnosticar logs protegidos e gerar bundle em `/root`;
 - acesso externo HTTPS aos repositorios Zabbix, PostgreSQL/PGDG e TimescaleDB quando aplicavel.
 
+## Compatibilidade
+
+| Sistema | Database | Server | Proxy | Status |
+| --- | --- | --- | --- | --- |
+| Ubuntu 24.04 LTS | Sim | Sim | Sim | Recomendado |
+| Debian 12 | Sim | Sim | Sim | Suportado |
+| Debian 13 | Sim | Sim | Sim | Suportado quando os repositorios oficiais estiverem publicados |
+| AlmaLinux/Rocky/RHEL | Nao | Nao | Nao | Planejado, ainda bloqueado com abort seguro |
+
 ## Instalacao Rapida
+
+Se ja estiver logado como `root` (comum em Debian minimo), use os comandos sem
+`sudo`. Se estiver em um usuario administrativo no Ubuntu, pode usar `sudo`.
+
+One-liner latest, a partir do branch `main`, como `root`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/main/AUTOMACAO-ZBX-UNIFIED.sh | bash
+```
+
+One-liner latest com `sudo`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/main/AUTOMACAO-ZBX-UNIFIED.sh | sudo bash
+```
+
+One-liner versao fixa `v5.5`, como `root`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/v5.5/AUTOMACAO-ZBX-UNIFIED.sh | bash
+```
+
+One-liner versao fixa `v5.5` com `sudo`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/v5.5/AUTOMACAO-ZBX-UNIFIED.sh | sudo bash
+```
+
+Forma auditavel, baixando o arquivo antes de executar:
 
 Latest, a partir do branch `main`:
 
@@ -44,7 +86,7 @@ Latest, a partir do branch `main`:
 curl -fsSL -o AUTOMACAO-ZBX-UNIFIED.sh \
   https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/main/AUTOMACAO-ZBX-UNIFIED.sh
 chmod +x AUTOMACAO-ZBX-UNIFIED.sh
-sudo ./AUTOMACAO-ZBX-UNIFIED.sh
+./AUTOMACAO-ZBX-UNIFIED.sh
 ```
 
 Versao fixa, reproduzivel por tag:
@@ -53,7 +95,7 @@ Versao fixa, reproduzivel por tag:
 curl -fsSL -o AUTOMACAO-ZBX-UNIFIED.sh \
   https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/v5.5/AUTOMACAO-ZBX-UNIFIED.sh
 chmod +x AUTOMACAO-ZBX-UNIFIED.sh
-sudo ./AUTOMACAO-ZBX-UNIFIED.sh
+./AUTOMACAO-ZBX-UNIFIED.sh
 ```
 
 Via clone:
@@ -61,15 +103,17 @@ Via clone:
 ```bash
 git clone https://github.com/denysg001/zabbix-unified-installer.git
 cd zabbix-unified-installer
-sudo ./AUTOMACAO-ZBX-UNIFIED.sh
+./AUTOMACAO-ZBX-UNIFIED.sh
 ```
 
 ## Modos Diretos
 
+Como `root`:
+
 ```bash
-sudo ./AUTOMACAO-ZBX-UNIFIED.sh db
-sudo ./AUTOMACAO-ZBX-UNIFIED.sh server
-sudo ./AUTOMACAO-ZBX-UNIFIED.sh proxy
+./AUTOMACAO-ZBX-UNIFIED.sh db
+./AUTOMACAO-ZBX-UNIFIED.sh server
+./AUTOMACAO-ZBX-UNIFIED.sh proxy
 ```
 
 Validar o proprio instalador sem instalar nada:
@@ -81,13 +125,13 @@ Validar o proprio instalador sem instalar nada:
 Diagnostico pos-instalacao:
 
 ```bash
-sudo ./AUTOMACAO-ZBX-UNIFIED.sh server --doctor-export
+./AUTOMACAO-ZBX-UNIFIED.sh server --doctor-export
 ```
 
 Pacote unico para suporte:
 
 ```bash
-sudo ./AUTOMACAO-ZBX-UNIFIED.sh --collect-support-bundle
+./AUTOMACAO-ZBX-UNIFIED.sh --collect-support-bundle
 ```
 
 O pacote sera salvo em `/root/zabbix_support_bundle_YYYYMMDD_HHMMSS.tar.gz` e pode conter credenciais, PSKs e outros dados sensiveis.
@@ -140,7 +184,7 @@ cat /root/zabbix_doctor_report.txt
 Quando quiser enviar tudo em um unico arquivo para analise:
 
 ```bash
-sudo ./AUTOMACAO-ZBX-UNIFIED.sh --collect-support-bundle
+./AUTOMACAO-ZBX-UNIFIED.sh --collect-support-bundle
 ```
 
 ## Fonte Da Verdade

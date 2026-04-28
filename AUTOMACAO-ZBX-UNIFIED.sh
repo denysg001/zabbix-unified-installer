@@ -1607,6 +1607,28 @@ check_required_commands() {
     [[ "$missing" == "0" ]] || { echo -e "\n${VERMELHO}${NEGRITO}ERRO:${RESET} comandos obrigatórios ausentes."; exit 1; }
 }
 
+check_bootstrap_downloader() {
+    local has_downloader=0
+    if type -P curl >/dev/null 2>&1; then
+        echo -e "  ${VERDE}✔${RESET} curl"
+        has_downloader=1
+    else
+        echo -e "  ${AMARELO}⚠${RESET} curl não encontrado agora; será instalado nas dependências base."
+    fi
+    if type -P wget >/dev/null 2>&1; then
+        echo -e "  ${VERDE}✔${RESET} wget"
+        has_downloader=1
+    else
+        echo -e "  ${AMARELO}⚠${RESET} wget não encontrado agora; será instalado nas dependências base."
+    fi
+    if [[ "$has_downloader" != "1" ]]; then
+        echo -e "\n${VERMELHO}${NEGRITO}ERRO:${RESET} curl e wget ausentes."
+        echo -e "  Instale ao menos um downloader antes de iniciar:"
+        echo -e "  ${NEGRITO}apt-get update && apt-get install -y curl${RESET}"
+        exit 1
+    fi
+}
+
 port_process_info() {
     local port="$1" raw proc pid_count suffix
     if command -v ss >/dev/null 2>&1; then
@@ -1797,7 +1819,8 @@ preflight_install_check() {
     print_environment_context
     warn_previous_installation "$component"
     echo -e "\n${CIANO}${NEGRITO}▸ Comandos obrigatórios${RESET}"
-    check_required_commands apt-get apt-cache dpkg systemctl curl wget openssl ip awk sed grep gzip
+    check_required_commands apt-get apt-cache dpkg systemctl openssl ip awk sed grep gzip
+    check_bootstrap_downloader
     echo -e "\n${CIANO}${NEGRITO}▸ Portas críticas${RESET}"
     case "$component" in
         db)     confirm_port_if_busy 5432 db "PostgreSQL" ;;
