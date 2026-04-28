@@ -1,0 +1,36 @@
+name: Validate installer
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Bash syntax and ShellCheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Validate Bash syntax
+        run: bash -n AUTOMACAO-ZBX-UNIFIED.sh
+
+      - name: Run ShellCheck errors
+        run: shellcheck -S error AUTOMACAO-ZBX-UNIFIED.sh

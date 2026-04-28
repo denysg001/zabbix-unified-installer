@@ -1,5 +1,7 @@
 # Zabbix Unified Installer
 
+[![Validate installer](https://github.com/denysg001/zabbix-unified-installer/actions/workflows/validate.yml/badge.svg)](https://github.com/denysg001/zabbix-unified-installer/actions/workflows/validate.yml)
+
 Instalador Bash unico para Zabbix Database, Server e Proxy.
 
 O objetivo deste repositorio e ser a fonte oficial do instalador, com historico limpo, versoes rastreaveis por Git e releases confiaveis.
