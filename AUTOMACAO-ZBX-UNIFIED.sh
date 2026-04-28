@@ -941,6 +941,44 @@ validate_zabbix_identity() {
     fi
 }
 
+validate_proxy_server_value() {
+    local value="$1" mode="$2" label="${3:-Server do Proxy}"
+    local server_list entry host port
+
+    if [[ -z "$value" || "$value" =~ [[:cntrl:]] || "$value" =~ ^[[:space:]]|[[:space:]]$ ]]; then
+        echo -e "   ${VERMELHO}${label} inválido.${RESET}"
+        return 1
+    fi
+    [[ "$mode" != "0" ]] && return 0
+
+    server_list="${value//;/ }"
+    server_list="${server_list//,/ }"
+    for entry in $server_list; do
+        entry="${entry//[[:space:]]/}"
+        [[ -z "$entry" ]] && continue
+        host="$entry"
+        port=""
+        if [[ "$entry" == *":"* && "$entry" != *"]"* ]]; then
+            host="${entry%:*}"
+            port="${entry##*:}"
+        fi
+        host="${host#[}"
+        host="${host%]}"
+        if [[ "$host" == "0" || "$host" == "0.0.0.0" || "$host" == "::" ]]; then
+            echo -e "   ${VERMELHO}${label} inválido para Proxy ativo: ${entry}${RESET}"
+            echo -e "   Informe o IP/DNS real do Zabbix Server. Exemplo: 10.1.30.111"
+            return 1
+        fi
+        if [[ -n "$port" ]]; then
+            if [[ ! "$port" =~ ^[0-9]+$ || "$port" -lt 1 || "$port" -gt 65535 ]]; then
+                echo -e "   ${VERMELHO}Porta inválida em ${entry}.${RESET}"
+                return 1
+            fi
+        fi
+    done
+    return 0
+}
+
 sql_quote_literal() {
     local s="$1"
     s="${s//\'/\'\'}"
@@ -951,6 +989,24 @@ sql_quote_ident() {
     local s="$1"
     s="${s//\"/\"\"}"
     printf '"%s"' "$s"
+}
+
+package_version() {
+    local pkg="$1"
+    case "$OS_FAMILY" in
+        ubuntu|debian)
+            dpkg-query -W -f='${Version}' "$pkg" 2>/dev/null || true
+            ;;
+        rhel)
+            rpm -q --qf '%{VERSION}-%{RELEASE}' "$pkg" 2>/dev/null || true
+            ;;
+    esac
+}
+
+package_version_or_na() {
+    local version
+    version=$(package_version "$1")
+    printf '%s' "${version:-N/D}"
 }
 
 pgpass_escape() {
@@ -1033,6 +1089,11 @@ check_proxy_server_connectivity() {
         if [[ "$entry" == *":"* && "$entry" != *"]"* ]]; then
             host="${entry%:*}"
             port="${entry##*:}"
+        fi
+        if [[ "$host" == "0" || "$host" == "0.0.0.0" || "$host" == "::" ]]; then
+            printf "  %-34s ${AMARELO}%s${RESET}\n" "${host}:${port}" "destino inválido para Proxy ativo"
+            [[ "${DOCTOR_ACTIVE:-0}" == "1" ]] && DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
+            continue
         fi
         total=$(( total + 1 ))
         if test_tcp_connectivity "$host" "$port" 5; then
@@ -2183,6 +2244,13 @@ run_self_test() {
         _self_ok "json_escape escapa aspas e barras"
     else
         _self_fail "json_escape retornou valor inesperado"
+    fi
+
+    if ! validate_proxy_server_value "0" "0" "Server do Proxy" >/dev/null 2>&1 && \
+       validate_proxy_server_value "10.1.30.111" "0" "Server do Proxy" >/dev/null 2>&1; then
+        _self_ok "Proxy ativo rejeita Server=0 e aceita IP real"
+    else
+        _self_fail "Validação do Server do Proxy ativo falhou"
     fi
 
     case "$OS_FAMILY" in
@@ -3659,15 +3727,15 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
             printf "  %-34s ${VERMELHO}%s${RESET}\n" "zabbix-agent2:" "FALHOU ✖"
     fi
     echo -e "\n${CIANO}${NEGRITO}▸ VERSÕES DOS PACOTES INSTALADOS${RESET}"
-    PG_PKG_VER=$(dpkg -l "postgresql-${PG_VER}" 2>/dev/null | awk '/^ii/{print $3}' | head -1 || echo "N/D")
-    TSDB_PKG_VER=$(dpkg -l "timescaledb-2-postgresql-${PG_VER}" 2>/dev/null | awk '/^ii/{print $3}' | head -1 || echo "N/D")
+    PG_PKG_VER=$(package_version "postgresql-${PG_VER}")
+    TSDB_PKG_VER=$(package_version "timescaledb-2-postgresql-${PG_VER}")
     TSDB_EXT_VER=$(postgres_psql_timeout 45 -d "${DB_NAME}" -tAc \
         "SELECT extversion FROM pg_extension WHERE extname='timescaledb';" 2>/dev/null | xargs || echo "N/D")
-    printf "  %-34s %s\n" "postgresql-${PG_VER} (pacote):" "${PG_PKG_VER}"
-    printf "  %-34s %s\n" "timescaledb-2-postgresql-${PG_VER}:" "${TSDB_PKG_VER}"
+    printf "  %-34s %s\n" "postgresql-${PG_VER} (pacote):" "${PG_PKG_VER:-N/D}"
+    printf "  %-34s %s\n" "timescaledb-2-postgresql-${PG_VER}:" "${TSDB_PKG_VER:-N/D}"
     printf "  %-34s %s\n" "TimescaleDB (extensão na BD):" "${TSDB_EXT_VER}"
     printf "  %-34s %s\n" "timescaledb-tune:" "${TSDB_TUNE_STATUS:-não executado}"
-    [[ "$INSTALL_AGENT" == "1" ]] && printf "  %-34s %s\n" "zabbix-agent2:" "$(dpkg -l zabbix-agent2 2>/dev/null | awk '/^ii/{print $3}' | head -1 || echo N/D)"
+    [[ "$INSTALL_AGENT" == "1" ]] && printf "  %-34s %s\n" "zabbix-agent2:" "$(package_version_or_na zabbix-agent2)"
     echo -e "\n${CIANO}${NEGRITO}▸ PARÂMETROS postgresql.conf CONFIRMADOS${RESET}"
     if [[ -f "$PG_CONF" ]]; then
         conf_val() { timeout 10 awk -v k="$1" '$0 ~ "^[[:space:]]*" k "[[:space:]]*=" {val=$0; sub(/.*=[[:space:]]*/, "", val); sub(/[[:space:]]*#.*/, "", val); last=val} END{gsub(/^[[:space:]]+|[[:space:]]+$/, "", last); print last}' "$PG_CONF" 2>/dev/null || true; }
@@ -5049,11 +5117,11 @@ LOGEOF
     printf "  %-34s %s\n" "RAM total:" "${SV_RAM} MB"
     printf "  %-34s %s\n" "Núcleos CPU:" "${SV_CORES}"
     echo -e "\n${CIANO}${NEGRITO}▸ VERSÕES DOS PACOTES INSTALADOS${RESET}"
-    printf "  %-34s %s\n" "zabbix-server-pgsql:" "$(dpkg -l zabbix-server-pgsql 2>/dev/null | awk '/^ii/{print $3}' | head -1 || echo N/D)"
+    printf "  %-34s %s\n" "zabbix-server-pgsql:" "$(package_version_or_na zabbix-server-pgsql)"
     printf "  %-34s %s\n" "nginx (binário):" "$(nginx -v 2>&1 | head -1 || echo N/D)"
     printf "  %-34s %s\n" "PHP ${PHP_VER} (binário):" "$(php${PHP_VER} --version 2>/dev/null | head -1 | cut -d' ' -f1-2 || echo N/D)"
-    printf "  %-34s %s\n" "postgresql-client-${PG_VER}:" "$(dpkg -l postgresql-client-${PG_VER} 2>/dev/null | awk '/^ii/{print $3}' | head -1 || echo N/D)"
-    [[ "$INSTALL_AGENT" == "1" ]] && printf "  %-34s %s\n" "zabbix-agent2:" "$(dpkg -l zabbix-agent2 2>/dev/null | awk '/^ii/{print $3}' | head -1 || echo N/D)"
+    printf "  %-34s %s\n" "postgresql-client-${PG_VER}:" "$(package_version_or_na "postgresql-client-${PG_VER}")"
+    [[ "$INSTALL_AGENT" == "1" ]] && printf "  %-34s %s\n" "zabbix-agent2:" "$(package_version_or_na zabbix-agent2)"
     echo -e "\n${CIANO}${NEGRITO}▸ ACESSO AO FRONTEND${RESET}"
     [[ "$USE_HTTPS" == "1" ]] && printf "  %-34s ${VERDE}%s${RESET}\n" "URL de Acesso:" "https://${HOST_IP}:${NGINX_PORT}" || \
                                   printf "  %-34s ${VERDE}%s${RESET}\n" "URL de Acesso:" "http://${HOST_IP}:${NGINX_PORT}"
@@ -5236,10 +5304,10 @@ EOF
         echo -e "   Se ProxyMode=1 (Passivo): Lista de IPs autorizados (separados por ',')"
         while true; do
             read -rp "   Preencher: " ZBX_SERVER
-            [[ -n "$ZBX_SERVER" ]] && break
-            echo -e "   ${VERMELHO}Campo obrigatório.${RESET}"
+            if validate_proxy_server_value "$ZBX_SERVER" "$PROXY_MODE" "Server do Proxy"; then
+                break
+            fi
         done
-        validate_zabbix_identity "$ZBX_SERVER" "Server do Proxy"
         echo -e "\n${AMARELO}Hostname${RESET} (Obrigatório — deve ser idêntico ao configurado no Server)"
         while true; do
             read -rp "   Preencher: " ZBX_HOSTNAME
@@ -5742,12 +5810,12 @@ EOF
     fi
     check_proxy_server_connectivity "$ZBX_SERVER" "$PROXY_MODE"
     echo -e "\n${CIANO}${NEGRITO}▸ VERSÕES DOS PACOTES INSTALADOS${RESET}"
-    PX_PKG_VER=$(dpkg -l zabbix-proxy-sqlite3 2>/dev/null | awk '/^ii/{print $3}' | head -n 1 || true)
+    PX_PKG_VER=$(package_version zabbix-proxy-sqlite3)
     SQLITE_VER=$(sqlite3 --version 2>/dev/null | awk '{print $1}' || true)
     printf "  %-34s %s\n" "zabbix-proxy-sqlite3:" "${PX_PKG_VER:-N/D}"
     printf "  %-34s %s\n" "sqlite3:" "${SQLITE_VER:-N/D}"
     if [[ "$INSTALL_AGENT" == "1" ]]; then
-        AG_PKG_VER=$(dpkg -l zabbix-agent2 2>/dev/null | awk '/^ii/{print $3}' | head -n 1 || true)
+        AG_PKG_VER=$(package_version zabbix-agent2)
         printf "  %-34s %s\n" "zabbix-agent2:" "${AG_PKG_VER:-N/D}"
     fi
     echo -e "\n${CIANO}${NEGRITO}▸ ESTADO DOS SERVIÇOS${RESET}"
