@@ -4591,9 +4591,10 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
             # if_not_exists=true: idempotente, não falha se a política já existir
             local _ok=0 _total=0
             _configure_one_tsdb_policy() {
-                local table="$1" interval="$2"
-                psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" \
-                    -v ON_ERROR_STOP=1 -qAt <<SQL >> "$LOG_FILE" 2>&1
+                local table="$1" interval="$2" result
+                result=$(psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" \
+                    -v ON_ERROR_STOP=1 -qAt <<SQL 2>> "$LOG_FILE" | tee -a "$LOG_FILE" | tail -n 1 || true
+CREATE TEMP TABLE zbx_tsdb_policy_result(status text) ON COMMIT DROP;
 DO \$\$
 BEGIN
     BEGIN
@@ -4607,12 +4608,17 @@ BEGIN
     END;
     BEGIN
         PERFORM add_compression_policy('${table}', INTERVAL '${interval}', if_not_exists => true);
+        INSERT INTO zbx_tsdb_policy_result(status) VALUES ('applied');
     EXCEPTION WHEN OTHERS THEN
         RAISE NOTICE 'TimescaleDB compression policy skipped for ${table}: %', SQLERRM;
+        INSERT INTO zbx_tsdb_policy_result(status) VALUES ('skipped');
     END;
 END
 \$\$;
+SELECT status FROM zbx_tsdb_policy_result LIMIT 1;
 SQL
+                )
+                [[ "$result" == "applied" ]]
             }
             for _t in history history_uint history_str history_log history_text; do
                 _total=$((_total+1))
@@ -4622,7 +4628,11 @@ SQL
                 _total=$((_total+1))
                 _configure_one_tsdb_policy "$_t" "1 day" && _ok=$((_ok+1)) || true
             done
-            echo -e "  ${VERDE}Políticas aplicadas: ${_ok}/${_total} tabelas (histórico ≥7d | tendências ≥1d)${RESET}"
+            if [[ "$_ok" -eq "$_total" ]]; then
+                echo -e "  ${VERDE}Políticas aplicadas: ${_ok}/${_total} tabelas (histórico ≥7d | tendências ≥1d)${RESET}"
+            else
+                echo -e "  ${AMARELO}Políticas aplicadas: ${_ok}/${_total}; $((_total - _ok)) ignorada(s) pela versão/configuração atual do TimescaleDB.${RESET}"
+            fi
         }
         run_step "Configurando compressão automática TimescaleDB (histórico 7d, tendências 1d)" \
             configure_tsdb_compression
