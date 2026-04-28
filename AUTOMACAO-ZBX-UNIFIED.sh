@@ -571,6 +571,7 @@ chmod 700 "$VALIDATION_CACHE_DIR" 2>/dev/null || true
 
 clear() { printf '\033c' 2>/dev/null || :; }
 INSTALL_WARNINGS=()
+ZBX_FRONTEND_LANG="en_US"
 
 # ------------------------------------------------------------------------------
 # 3. FUNÇÕES COMPARTILHADAS
@@ -667,6 +668,36 @@ ensure_utf8_locales() {
     else
         add_install_warning "Locale en_US.UTF-8 não pôde ser ativado automaticamente; instalação continuará."
         log_msg "WARN" "Locale en_US.UTF-8 não pôde ser ativado automaticamente; instalação continuará."
+    fi
+    return 0
+}
+
+php_supports_pt_br_locale() {
+    command -v php >/dev/null 2>&1 || return 1
+    php -r 'exit(setlocale(LC_ALL, "pt_BR.UTF-8", "pt_BR.utf8", "pt_BR") === false ? 1 : 0);' \
+        >/dev/null 2>&1
+}
+
+ensure_zabbix_frontend_locales() {
+    ensure_utf8_locales
+
+    if php_supports_pt_br_locale; then
+        ZBX_FRONTEND_LANG="pt_BR"
+        log_msg "INFO" "Locale pt_BR validado pelo PHP; frontend Zabbix será configurado em pt_BR."
+        return 0
+    fi
+
+    if [[ "$OS_FAMILY" == "debian" ]] && check_package_available "locales-all" "locales-all" 1; then
+        apt-get install "${APT_FLAGS[@]}" locales-all
+        ensure_utf8_locales
+    fi
+
+    if php_supports_pt_br_locale; then
+        ZBX_FRONTEND_LANG="pt_BR"
+        log_msg "INFO" "Locale pt_BR validado pelo PHP após instalar locales-all."
+    else
+        ZBX_FRONTEND_LANG="en_US"
+        add_install_warning "Locale pt_BR indisponível para PHP-FPM; Admin do frontend ficará em en_US para evitar alertas vermelhos."
     fi
     return 0
 }
@@ -4569,7 +4600,7 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
     }
     run_step "Validando arquivos de configuração do Zabbix Server" ensure_server_config_files
 
-    run_step "Gerando locales pt_BR.UTF-8 e en_US.UTF-8" ensure_utf8_locales
+    run_step "Validando locale do frontend (pt_BR com fallback en_US)" ensure_zabbix_frontend_locales
 
     if [[ "$INSTALL_AGENT" == "1" ]]; then
         install_agent2_pkg() {
@@ -4741,13 +4772,16 @@ SQL
     fi
 
     set_default_language() {
+        local admin_lang_sql timezone_sql
+        admin_lang_sql=$(sql_quote_literal "${ZBX_FRONTEND_LANG:-en_US}")
+        timezone_sql=$(sql_quote_literal "${TIMEZONE}")
         psql -h "${DB_HOST}" -p "${DB_PORT}" \
             -U "${DB_USER}" -d "${DB_NAME}" \
-            -c "UPDATE users SET lang='pt_BR', timezone='${TIMEZONE}' WHERE username='Admin';" \
+            -c "UPDATE users SET lang=${admin_lang_sql}, timezone=${timezone_sql} WHERE username='Admin';" \
             >> "$LOG_FILE" 2>&1 || true
 
     }
-    run_step "Definindo idioma pt_BR e timezone ${TIMEZONE} (Admin)" set_default_language
+    run_step "Definindo idioma ${ZBX_FRONTEND_LANG:-en_US} e timezone ${TIMEZONE} (Admin)" set_default_language
 
     SV_F="/etc/zabbix/zabbix_server.conf"
     apply_server_config() {
