@@ -981,6 +981,25 @@ is_forbidden_active_proxy_target() {
     return 1
 }
 
+first_endpoint_host() {
+    local value="$1" entry host
+    value="${value//;/ }"
+    value="${value//,/ }"
+    for entry in $value; do
+        entry="${entry//[[:space:]]/}"
+        [[ -z "$entry" ]] && continue
+        host="$entry"
+        if [[ "$entry" == *":"* && "$entry" != *"]"* ]]; then
+            host="${entry%:*}"
+        fi
+        host="${host#[}"
+        host="${host%]}"
+        printf '%s' "$host"
+        return 0
+    done
+    return 1
+}
+
 validate_proxy_server_value() {
     local value="$1" mode="$2" label="${3:-Server do Proxy}"
     local server_list entry host port
@@ -2760,11 +2779,25 @@ run_doctor_mode() {
                 check_proxy_server_connectivity "$(conf_value /etc/zabbix/zabbix_proxy.conf Server)" "$(conf_value /etc/zabbix/zabbix_proxy.conf ProxyMode)"
             }
             if [[ -f /etc/zabbix/zabbix_agent2.conf ]]; then
+                local proxy_mode agent_server agent_server_active
+                proxy_mode="$(conf_value /etc/zabbix/zabbix_proxy.conf ProxyMode)"
+                agent_server="$(conf_value /etc/zabbix/zabbix_agent2.conf Server)"
+                agent_server_active="$(conf_value /etc/zabbix/zabbix_agent2.conf ServerActive)"
                 echo -e "\n${CIANO}${NEGRITO}▸ AGENT 2 DO PROXY${RESET}"
                 validate_service_active zabbix-agent2
                 printf "  %-18s %s\n" "Hostname:" "$(conf_value /etc/zabbix/zabbix_agent2.conf Hostname)"
-                printf "  %-18s %s\n" "Server:" "$(conf_value /etc/zabbix/zabbix_agent2.conf Server)"
-                printf "  %-18s %s\n" "ServerActive:" "$(conf_value /etc/zabbix/zabbix_agent2.conf ServerActive)"
+                printf "  %-18s %s\n" "Server:" "$agent_server"
+                printf "  %-18s %s\n" "ServerActive:" "$agent_server_active"
+                if [[ "$proxy_mode" == "0" ]]; then
+                    validate_proxy_server_value "$agent_server" "$proxy_mode" "Server do Agent 2" >/dev/null 2>&1 || {
+                        echo -e "  ${AMARELO}⚠${RESET} Server do Agent 2 aponta para destino local/inválido em Proxy ativo."
+                        DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
+                    }
+                    validate_proxy_server_value "$agent_server_active" "$proxy_mode" "ServerActive do Agent 2" >/dev/null 2>&1 || {
+                        echo -e "  ${AMARELO}⚠${RESET} ServerActive do Agent 2 aponta para destino local/inválido em Proxy ativo."
+                        DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
+                    }
+                fi
                 [[ -f /etc/zabbix/zabbix_agent2.psk ]] && \
                     echo -e "  ${VERDE}✔${RESET} PSK configurado (/etc/zabbix/zabbix_agent2.psk)" || \
                     echo -e "  ${AMARELO}⚠${RESET} PSK não configurado"
@@ -5366,12 +5399,29 @@ EOF
         echo -e "\n${CIANO}${NEGRITO}>>> ZABBIX AGENT 2 <<<${RESET}"
         ask_yes_no "Instalar o Zabbix Agent 2 neste host?" INSTALL_AGENT
         if [[ "$INSTALL_AGENT" == "1" ]]; then
-            echo -e "\n${AMARELO}Server${RESET} (Escuta Passiva. Padrão Zabbix: 127.0.0.1)"
-            read -rp "   Valor Recomendado [127.0.0.1]: " AG_SERVER; AG_SERVER=${AG_SERVER:-127.0.0.1}
-            validate_zabbix_identity "$AG_SERVER" "Server do Agente"
-            echo -e "\n${AMARELO}ServerActive${RESET} (Envio Ativo. Padrão Zabbix: 127.0.0.1)"
-            read -rp "   Valor Recomendado [127.0.0.1]: " AG_SERVER_ACTIVE; AG_SERVER_ACTIVE=${AG_SERVER_ACTIVE:-127.0.0.1}
-            validate_zabbix_identity "$AG_SERVER_ACTIVE" "ServerActive do Agente"
+            local agent_default
+            agent_default=$(first_endpoint_host "$ZBX_SERVER" 2>/dev/null || true)
+            [[ -z "$agent_default" || "$PROXY_MODE" != "0" ]] && agent_default="127.0.0.1"
+            echo -e "\n${AMARELO}Server${RESET} (Escuta Passiva autorizada no Agent 2)"
+            echo -e "   Em Proxy ativo, use o IP/DNS real do Zabbix Server, não localhost."
+            while true; do
+                read -rp "   Valor Recomendado [${agent_default}]: " AG_SERVER; AG_SERVER=${AG_SERVER:-$agent_default}
+                if [[ "$PROXY_MODE" == "0" ]]; then
+                    validate_proxy_server_value "$AG_SERVER" "$PROXY_MODE" "Server do Agente" && break
+                else
+                    validate_zabbix_identity "$AG_SERVER" "Server do Agente"; break
+                fi
+            done
+            echo -e "\n${AMARELO}ServerActive${RESET} (Envio Ativo do Agent 2)"
+            echo -e "   Em Proxy ativo, use o IP/DNS real do Zabbix Server, não localhost."
+            while true; do
+                read -rp "   Valor Recomendado [${agent_default}]: " AG_SERVER_ACTIVE; AG_SERVER_ACTIVE=${AG_SERVER_ACTIVE:-$agent_default}
+                if [[ "$PROXY_MODE" == "0" ]]; then
+                    validate_proxy_server_value "$AG_SERVER_ACTIVE" "$PROXY_MODE" "ServerActive do Agente" && break
+                else
+                    validate_zabbix_identity "$AG_SERVER_ACTIVE" "ServerActive do Agente"; break
+                fi
+            done
             echo -e "\n${AMARELO}Hostname${RESET} (Identificação do Agente)"
             echo -e "   Geralmente mantemos igual ao nome do Proxy ($ZBX_HOSTNAME)."
             local AG_SAME
