@@ -2,44 +2,43 @@
 
 [![Validate installer](https://github.com/denysg001/zabbix-unified-installer/actions/workflows/validate.yml/badge.svg)](https://github.com/denysg001/zabbix-unified-installer/actions/workflows/validate.yml)
 
-Instalador Bash unico para Zabbix Database, Server e Proxy.
+Instalador unificado e resiliente para Zabbix Database, Server e Proxy, com fluxo interativo, instalacao limpa, diagnostico integrado e exports para suporte.
 
-O objetivo deste repositorio e ser a fonte oficial do instalador, com historico limpo, versoes rastreaveis por Git e releases confiaveis.
+## O Que Ele Faz
 
-## Fonte da Verdade
+- Instala Zabbix Database com PostgreSQL e TimescaleDB opcional.
+- Instala Zabbix Server com frontend, Nginx, PHP-FPM e schema PostgreSQL.
+- Instala Zabbix Proxy com SQLite e Agent 2 opcional.
+- Mantem compatibilidade com Ubuntu e Debian suportados pelo script.
+- Entrega certificado final com credenciais completas.
+- Gera resumo plain, JSON estruturado e pacote unico de suporte.
 
-O arquivo principal e:
+## Requisitos
 
-```text
-AUTOMACAO-ZBX-UNIFIED.sh
-```
+Sistema operacional:
 
-Este e o unico arquivo que deve receber desenvolvimento normal.
+- Ubuntu suportado pelo instalador;
+- Debian suportado pelo instalador.
 
-Nao ha necessidade de manter copias do script dentro do repositorio para versionar releases. Versoes oficiais devem ser recuperadas por tags Git e GitHub Releases.
+Arquitetura:
 
-## Latest vs Versao Fixa
+- `amd64`;
+- `arm64`.
 
-Use `main` quando quiser a versao mais recente em desenvolvimento:
+Hardware recomendado:
 
-```text
-https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/main/AUTOMACAO-ZBX-UNIFIED.sh
-```
+- minimo pratico: 2 GB RAM, 2 vCPU;
+- recomendado para Server/Database: 4 GB+ RAM;
+- disco livre recomendado: 2 GB+ antes da instalacao.
 
-Use uma tag quando quiser uma versao fixa e reproduzivel:
+Permissoes:
 
-```text
-https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/v5.4/AUTOMACAO-ZBX-UNIFIED.sh
-```
+- execucao com `root`/`sudo` para instalar, limpar, diagnosticar logs protegidos e gerar bundle em `/root`;
+- acesso externo HTTPS aos repositorios Zabbix, PostgreSQL/PGDG e TimescaleDB quando aplicavel.
 
-Regra operacional:
+## Instalacao Rapida
 
-- `main`: pode receber correcoes novas.
-- `vX.Y`: nao muda depois de publicada.
-
-## Instalacao via Curl
-
-Latest:
+Latest, a partir do branch `main`:
 
 ```bash
 curl -fsSL -o AUTOMACAO-ZBX-UNIFIED.sh \
@@ -48,12 +47,20 @@ chmod +x AUTOMACAO-ZBX-UNIFIED.sh
 sudo ./AUTOMACAO-ZBX-UNIFIED.sh
 ```
 
-Versao fixa:
+Versao fixa, reproduzivel por tag:
 
 ```bash
 curl -fsSL -o AUTOMACAO-ZBX-UNIFIED.sh \
   https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/v5.4/AUTOMACAO-ZBX-UNIFIED.sh
 chmod +x AUTOMACAO-ZBX-UNIFIED.sh
+sudo ./AUTOMACAO-ZBX-UNIFIED.sh
+```
+
+Via clone:
+
+```bash
+git clone https://github.com/denysg001/zabbix-unified-installer.git
+cd zabbix-unified-installer
 sudo ./AUTOMACAO-ZBX-UNIFIED.sh
 ```
 
@@ -65,7 +72,13 @@ sudo ./AUTOMACAO-ZBX-UNIFIED.sh server
 sudo ./AUTOMACAO-ZBX-UNIFIED.sh proxy
 ```
 
-Diagnostico:
+Validar o proprio instalador sem instalar nada:
+
+```bash
+./AUTOMACAO-ZBX-UNIFIED.sh --self-test
+```
+
+Diagnostico pos-instalacao:
 
 ```bash
 sudo ./AUTOMACAO-ZBX-UNIFIED.sh server --doctor-export
@@ -79,7 +92,31 @@ sudo ./AUTOMACAO-ZBX-UNIFIED.sh --collect-support-bundle
 
 O pacote sera salvo em `/root/zabbix_support_bundle_YYYYMMDD_HHMMSS.tar.gz` e pode conter credenciais, PSKs e outros dados sensiveis.
 
-## Arquivos Importantes no Host Instalado
+## Features Em Destaque
+
+- **Doctor integrado:** diagnostico por componente, com export para `/root/zabbix_doctor_report.txt`.
+- **Wipe controlado:** limpeza de instalacoes anteriores dentro do escopo escolhido.
+- **Deteccao de OS:** Ubuntu/Debian, codename, arquitetura, RAM e CPU.
+- **Auto-tuning:** sugestoes de tuning para PostgreSQL e fallback seguro para TimescaleDB.
+- **TimescaleDB opcional:** falha de TimescaleDB nao deve quebrar instalacao base.
+- **Agent 2 funcional:** opcional nos componentes aplicaveis.
+- **Exports de suporte:** resumo colorido, plain text, JSON e bundle `.tar.gz`.
+- **Erro estruturado:** falhas fatais em `/root/zabbix_install_error.json`.
+- **CI no GitHub:** `bash -n` e ShellCheck em cada push/PR.
+
+## Screenshots
+
+Prints e GIFs reais do terminal podem ser adicionados em `docs/assets/`.
+
+Sugestoes de capturas:
+
+- menu inicial com banner;
+- barra de progresso durante instalacao;
+- certificado final;
+- tela do Doctor;
+- bundle de suporte gerado.
+
+## Arquivos Importantes No Host Instalado
 
 Se der erro fatal, abra primeiro:
 
@@ -106,7 +143,38 @@ Quando quiser enviar tudo em um unico arquivo para analise:
 sudo ./AUTOMACAO-ZBX-UNIFIED.sh --collect-support-bundle
 ```
 
-## Politica de Versionamento
+## Fonte Da Verdade
+
+O arquivo principal e:
+
+```text
+AUTOMACAO-ZBX-UNIFIED.sh
+```
+
+Este e o unico arquivo que deve receber desenvolvimento normal.
+
+Nao ha necessidade de manter copias do script dentro do repositorio para versionar releases. Versoes oficiais devem ser recuperadas por tags Git e GitHub Releases.
+
+## Latest Vs Versao Fixa
+
+Use `main` quando quiser a versao mais recente em desenvolvimento:
+
+```text
+https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/main/AUTOMACAO-ZBX-UNIFIED.sh
+```
+
+Use uma tag quando quiser uma versao fixa e reproduzivel:
+
+```text
+https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/v5.4/AUTOMACAO-ZBX-UNIFIED.sh
+```
+
+Regra operacional:
+
+- `main`: pode receber correcoes novas.
+- `vX.Y`: nao muda depois de publicada.
+
+## Politica De Versionamento
 
 O versionamento oficial acontece por:
 
@@ -117,7 +185,7 @@ O versionamento oficial acontece por:
 Para publicar uma versao estavel:
 
 1. Atualizar `INSTALLER_VERSION` dentro de `AUTOMACAO-ZBX-UNIFIED.sh`.
-2. Atualizar o changelog no script e em `CHANGELOG.md`.
+2. Atualizar `CHANGELOG.md`.
 3. Validar com:
 
 ```bash
@@ -144,3 +212,8 @@ Regras:
 ## Releases Publicadas
 
 - `v5.4`: primeira versao oficial publicada neste repositorio.
+
+## Licenca
+
+Este projeto esta disponivel sob a licenca MIT. Veja [LICENSE](LICENSE).
+

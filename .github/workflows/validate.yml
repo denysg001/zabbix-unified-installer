@@ -32,5 +32,8 @@ jobs:
       - name: Validate Bash syntax
         run: bash -n AUTOMACAO-ZBX-UNIFIED.sh
 
+      - name: Run installer self-test
+        run: bash AUTOMACAO-ZBX-UNIFIED.sh --self-test
+
       - name: Run ShellCheck errors
         run: shellcheck -S error AUTOMACAO-ZBX-UNIFIED.sh

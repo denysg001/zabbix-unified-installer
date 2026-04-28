@@ -344,6 +344,7 @@ REPO_CHECK=0
 SAFE_MODE=0
 DEBUG_SERVICES=0
 COLLECT_SUPPORT_BUNDLE=0
+SELF_TEST_MODE=0
 REQUESTED_COMPONENT=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -358,6 +359,7 @@ while [[ $# -gt 0 ]]; do
         --safe) SAFE_MODE=1; shift ;;
         --debug-services) DEBUG_SERVICES=1; shift ;;
         --collect-support-bundle) COLLECT_SUPPORT_BUNDLE=1; shift ;;
+        --self-test) SELF_TEST_MODE=1; shift ;;
         --simulate|-s) SIMULATE_MODE=1; shift ;;
         --wipe) WIPE_MODE=1; shift ;;
         --wipe-db) WIPE_MODE=1; WIPE_DB=1; shift ;;
@@ -405,6 +407,7 @@ Opções:
   --safe        Exige confirmação extra antes de limpezas destrutivas.
   --debug-services Diagnostica serviços/portas/processos sem instalar nada.
   --collect-support-bundle Coleta diagnóstico em um .tar.gz para suporte.
+  --self-test   Valida o próprio instalador sem instalar nada.
   --mode <modo> Executa direto: db, server ou proxy.
   --wipe        Limpeza completa de Zabbix/Nginx, com confirmação.
   --wipe-db     Limpeza completa incluindo PostgreSQL/TimescaleDB e dados da BD.
@@ -426,6 +429,7 @@ Exemplos:
   $0 server --repo-check Valida repositórios/pacotes do Server sem instalar
   $0 --debug-services Diagnostica serviços sem instalar
   $0 --collect-support-bundle Gera pacote único para análise de problemas
+  $0 --self-test Valida funções internas e dependências básicas
   $0 --wipe     Remove instalações anteriores no escopo Zabbix/Nginx
   $0 --wipe-db  Remove também PostgreSQL/TimescaleDB e dados da BD
 
@@ -443,7 +447,7 @@ done
 
 [[ "$DOCTOR_EXPORT" == "1" ]] && DOCTOR_MODE=1
 
-if [[ "$CHECK_ONLY" != "1" && "$DRY_RUN" != "1" && "$SIMULATE_MODE" != "1" && "$LIST_VERSIONS" != "1" && "$LIST_SUPPORTED_OS" != "1" && "$DEBUG_SERVICES" != "1" && "$EUID" -ne 0 ]]; then
+if [[ "$CHECK_ONLY" != "1" && "$DRY_RUN" != "1" && "$SIMULATE_MODE" != "1" && "$LIST_VERSIONS" != "1" && "$LIST_SUPPORTED_OS" != "1" && "$DEBUG_SERVICES" != "1" && "$SELF_TEST_MODE" != "1" && "$EUID" -ne 0 ]]; then
     echo -e "${VERMELHO}${NEGRITO}ERRO:${RESET} O instalador precisa de permissões de root (sudo)."
     exit 1
 fi
@@ -1913,6 +1917,122 @@ run_check_mode() {
     echo -e "\n${VERDE}${NEGRITO}Check concluído. Nenhuma alteração foi feita.${RESET}\n"
 }
 
+run_self_test() {
+    local tmpdir fail=0 warn=0 test_file out_file script_path
+    tmpdir="$(mktemp -d /tmp/zabbix_self_test.XXXXXX)"
+    test_file="${tmpdir}/test.conf"
+    out_file="${tmpdir}/plain.txt"
+    script_path="${BASH_SOURCE[0]:-$0}"
+
+    _self_ok() {
+        printf "  ${VERDE}✔${RESET} %s\n" "$1"
+    }
+    _self_warn() {
+        printf "  ${AMARELO}⚠${RESET} %s\n" "$1"
+        warn=$(( warn + 1 ))
+    }
+    _self_fail() {
+        printf "  ${VERMELHO}✖${RESET} %s\n" "$1"
+        fail=$(( fail + 1 ))
+    }
+
+    echo -e "${CIANO}${NEGRITO}╔══════════════════════════════════════════════════════════╗${RESET}"
+    echo -e "${CIANO}${NEGRITO}║                    SELF-TEST DO INSTALADOR               ║${RESET}"
+    echo -e "${CIANO}${NEGRITO}╚══════════════════════════════════════════════════════════╝${RESET}"
+    printf "  %-28s %s\n" "Instalador:" "${INSTALLER_LABEL}"
+    printf "  %-28s %s\n" "Sistema detectado:" "${OS_DISPLAY:-N/D}"
+    printf "  %-28s %s\n" "Root:" "$([[ "$EUID" -eq 0 ]] && echo SIM || echo NÃO)"
+    echo ""
+
+    if [[ -f "$script_path" ]] && bash -n "$script_path" 2>/dev/null; then
+        _self_ok "Sintaxe Bash do arquivo atual"
+    else
+        _self_fail "Sintaxe Bash do arquivo atual"
+    fi
+
+    local cmd
+    for cmd in bash awk sed grep tr curl wget tar gzip mktemp; do
+        if type -P "$cmd" >/dev/null 2>&1; then
+            _self_ok "Comando disponível: ${cmd}"
+        else
+            _self_fail "Comando ausente: ${cmd}"
+        fi
+    done
+    for cmd in timeout apt-get apt-cache dpkg systemctl journalctl ss ip; do
+        if type -P "$cmd" >/dev/null 2>&1; then
+            _self_ok "Comando operacional disponível: ${cmd}"
+        elif [[ "$OS_FAMILY" == "ubuntu" || "$OS_FAMILY" == "debian" ]]; then
+            _self_fail "Comando obrigatório ausente em Ubuntu/Debian: ${cmd}"
+        else
+            _self_warn "Comando Linux ausente neste host não suportado: ${cmd}"
+        fi
+    done
+
+    printf 'DBPassword=abc=def\n# DBPassword=ignored\nDBUser=zabbix\n' > "$test_file"
+    if [[ "$(conf_value "$test_file" DBPassword)" == "abc=def" && "$(conf_value "$test_file" DBUser)" == "zabbix" ]]; then
+        _self_ok "conf_value preserva valores com '=' e ignora comentários"
+    else
+        _self_fail "conf_value não preservou valor esperado"
+    fi
+
+    printf '\033[31mERRO\033[0m\r texto\001\n' | sanitize_plain_text > "$out_file"
+    if LC_ALL=C awk 'BEGIN{bad=0} /ERRO texto/{seen=1} /[\001-\010\013\014\016-\037\177]/{bad=1} END{exit !(seen && !bad)}' "$out_file"; then
+        _self_ok "sanitize_plain_text remove ANSI, CR e controles perigosos"
+    else
+        _self_fail "sanitize_plain_text não gerou texto limpo esperado"
+    fi
+
+    if [[ "$(safe_count_matches 'nao-existe' "$test_file")" == "0" ]]; then
+        _self_ok "safe_count_matches retorna 0 sem abortar quando não há match"
+    else
+        _self_fail "safe_count_matches falhou em grep sem match"
+    fi
+
+    local escaped
+    escaped="$(json_escape 'senha "com" \ barra')"
+    if [[ "$escaped" == 'senha \"com\" \\ barra' ]]; then
+        _self_ok "json_escape escapa aspas e barras"
+    else
+        _self_fail "json_escape retornou valor inesperado"
+    fi
+
+    case "$OS_FAMILY" in
+        ubuntu|debian)
+            _self_ok "Sistema reconhecido como suportável: ${OS_DISPLAY}"
+            ;;
+        rhel)
+            _self_warn "Sistema RHEL detectado; fluxos ainda abortam de forma controlada"
+            ;;
+        *)
+            _self_warn "Sistema não suportado detectado: ${OS_DISPLAY}"
+            ;;
+    esac
+
+    if [[ "${RAM_MB:-0}" =~ ^[0-9]+$ && "${CPU_CORES:-0}" =~ ^[0-9]+$ ]]; then
+        _self_ok "Detecção básica de hardware: ${RAM_MB} MB RAM, ${CPU_CORES} CPU"
+    else
+        _self_warn "Detecção de hardware incompleta"
+    fi
+
+    echo -e "\n${CIANO}${NEGRITO}▸ URLs oficiais${RESET}"
+    printf "  %-28s %s\n" "Latest:" "https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/main/AUTOMACAO-ZBX-UNIFIED.sh"
+    printf "  %-28s %s\n" "v5.4 fixa:" "https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/v5.4/AUTOMACAO-ZBX-UNIFIED.sh"
+
+    rm -rf "$tmpdir"
+
+    echo -e "\n${CIANO}${NEGRITO}▸ RESULTADO${RESET}"
+    if [[ "$fail" -gt 0 ]]; then
+        printf "  ${VERMELHO}${NEGRITO}%-18s${RESET} %s falha(s), %s aviso(s)\n" "FALHOU" "$fail" "$warn"
+        exit 1
+    fi
+    if [[ "$warn" -gt 0 ]]; then
+        printf "  ${AMARELO}${NEGRITO}%-18s${RESET} %s aviso(s), nenhuma falha\n" "COM AVISOS" "$warn"
+    else
+        printf "  ${VERDE}${NEGRITO}%-18s${RESET} Nenhuma falha encontrada\n" "OK"
+    fi
+    echo -e "\n${VERDE}${NEGRITO}Self-test concluído. Nenhuma alteração foi feita.${RESET}\n"
+}
+
 debug_one_service() {
     local service="$1"
     echo -e "\n${CIANO}${NEGRITO}▸ ${service}${RESET}"
@@ -2356,6 +2476,7 @@ run_doctor_mode() {
 
 [[ "$LIST_VERSIONS" == "1" ]] && { show_supported_versions; exit 0; }
 [[ "$LIST_SUPPORTED_OS" == "1" ]] && { show_supported_os; exit 0; }
+[[ "$SELF_TEST_MODE" == "1" ]] && { run_self_test; exit 0; }
 validate_supported_ubuntu_any_component
 [[ "$COLLECT_SUPPORT_BUNDLE" == "1" ]] && { collect_support_bundle; exit 0; }
 [[ "$DEBUG_SERVICES" == "1" ]] && { run_debug_services; exit 0; }

@@ -4,7 +4,10 @@ Todas as versoes oficiais deste projeto sao publicadas por tag Git e GitHub Rele
 
 **main - v5.5-dev**
 
+- Adicionado modo `--self-test`, que valida funções internas, comandos essenciais, parsing de configuração, sanitização de texto, escape JSON e detecção básica de ambiente sem instalar nada.
 - Adicionado modo `--collect-support-bundle`, que gera um pacote `.tar.gz` em `/root` com resumo da instalacao, erro estruturado, Doctor, logs limitados, status de servicos, portas, pacotes e configuracoes relacionadas.
+- README reorganizado como página principal do projeto, com requisitos, instalação rápida, features, screenshots planejados, política de versionamento e licença.
+- Adicionada licença MIT.
 
 **v5.4 - 2026-04-28**
 
