@@ -218,3 +218,7 @@ Observacao: `v5.4` existiu como publicacao inicial do repositorio, mas nao e rec
 ## Licenca
 
 Este projeto esta disponivel sob a licenca MIT. Veja [LICENSE](LICENSE).
+
+O instalador nao redistribui os softwares que instala; Zabbix, PostgreSQL,
+TimescaleDB, Nginx, PHP, SQLite, OpenSSL e demais pacotes continuam sujeitos as
+suas proprias licencas. Veja [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

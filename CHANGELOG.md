@@ -2,6 +2,11 @@
 
 Todas as versoes oficiais deste projeto sao publicadas por tag Git e GitHub Release.
 
+**main - apos v5.5**
+
+- Adicionado `THIRD_PARTY_NOTICES.md` com avisos de licencas de terceiros, fontes oficiais e orientacao pratica para auditoria dos pacotes instalados no host.
+- README atualizado para separar claramente a licenca MIT do instalador das licencas dos softwares instalados via repositorios oficiais.
+
 **v5.5 - 2026-04-28**
 
 Versao estabilizada apos testes reais em ambientes Ubuntu/LXC para Database, Server e Proxy.
