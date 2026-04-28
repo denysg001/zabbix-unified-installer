@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-# ZABBIX — INSTALADOR UNIFICADO (DB + Server + Proxy) — v5.5-dev
+# ZABBIX — INSTALADOR UNIFICADO (DB + Server + Proxy) — v5.5
 # ==============================================================================
 # Componentes disponíveis (um por execução):
 #   1) BASE DE DADOS  — PostgreSQL + TimescaleDB        (DB v1.5)
@@ -27,7 +27,7 @@ write_error_json() {
     {
         echo "{"
         printf '  "timestamp": "%s",\n' "$(date -Is 2>/dev/null || date '+%Y-%m-%dT%H:%M:%S%z')"
-        printf '  "installer_version": "%s",\n' "${INSTALLER_VERSION:-v5.5-dev}"
+        printf '  "installer_version": "%s",\n' "${INSTALLER_VERSION:-v5.5}"
         printf '  "component": "%s",\n' "$esc_component"
         printf '  "exit_code": %s,\n' "$exit_code"
         printf '  "line": %s,\n' "$line_no"
@@ -353,7 +353,7 @@ post_validate_installation() {
 # ------------------------------------------------------------------------------
 VERDE="\e[32m"; AMARELO="\e[33m"; VERMELHO="\e[31m"
 CIANO="\e[36m"; NEGRITO="\e[1m"; RESET="\e[0m"
-INSTALLER_VERSION="v5.5-dev"
+INSTALLER_VERSION="v5.5"
 INSTALLER_LABEL="AUTOMACAO-ZBX-UNIFIED ${INSTALLER_VERSION}"
 
 clear() { printf '\033c' 2>/dev/null || :; }
@@ -2048,7 +2048,7 @@ run_self_test() {
 
     echo -e "\n${CIANO}${NEGRITO}▸ URLs oficiais${RESET}"
     printf "  %-28s %s\n" "Latest:" "https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/main/AUTOMACAO-ZBX-UNIFIED.sh"
-    printf "  %-28s %s\n" "v5.4 fixa:" "https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/v5.4/AUTOMACAO-ZBX-UNIFIED.sh"
+    printf "  %-28s %s\n" "v5.5 fixa:" "https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/v5.5/AUTOMACAO-ZBX-UNIFIED.sh"
 
     rm -rf "$tmpdir"
 

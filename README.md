@@ -51,7 +51,7 @@ Versao fixa, reproduzivel por tag:
 
 ```bash
 curl -fsSL -o AUTOMACAO-ZBX-UNIFIED.sh \
-  https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/v5.4/AUTOMACAO-ZBX-UNIFIED.sh
+  https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/v5.5/AUTOMACAO-ZBX-UNIFIED.sh
 chmod +x AUTOMACAO-ZBX-UNIFIED.sh
 sudo ./AUTOMACAO-ZBX-UNIFIED.sh
 ```
@@ -166,7 +166,7 @@ https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/main/AUTOMA
 Use uma tag quando quiser uma versao fixa e reproduzivel:
 
 ```text
-https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/v5.4/AUTOMACAO-ZBX-UNIFIED.sh
+https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/v5.5/AUTOMACAO-ZBX-UNIFIED.sh
 ```
 
 Regra operacional:
@@ -211,9 +211,10 @@ Regras:
 
 ## Releases Publicadas
 
-- `v5.4`: primeira versao oficial publicada neste repositorio.
+- `v5.5`: primeira versao estavel recomendada, estabilizada apos testes reais de Database, Server e Proxy em Ubuntu/LXC.
+
+Observacao: `v5.4` existiu como publicacao inicial do repositorio, mas nao e recomendada como versao final.
 
 ## Licenca
 
 Este projeto esta disponivel sob a licenca MIT. Veja [LICENSE](LICENSE).
-
