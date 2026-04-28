@@ -71,6 +71,14 @@ Diagnostico:
 sudo ./AUTOMACAO-ZBX-UNIFIED.sh server --doctor-export
 ```
 
+Pacote unico para suporte:
+
+```bash
+sudo ./AUTOMACAO-ZBX-UNIFIED.sh --collect-support-bundle
+```
+
+O pacote sera salvo em `/root/zabbix_support_bundle_YYYYMMDD_HHMMSS.tar.gz` e pode conter credenciais, PSKs e outros dados sensiveis.
+
 ## Arquivos Importantes no Host Instalado
 
 Se der erro fatal, abra primeiro:
@@ -90,6 +98,12 @@ Quando rodar o Doctor exportado:
 
 ```bash
 cat /root/zabbix_doctor_report.txt
+```
+
+Quando quiser enviar tudo em um unico arquivo para analise:
+
+```bash
+sudo ./AUTOMACAO-ZBX-UNIFIED.sh --collect-support-bundle
 ```
 
 ## Politica de Versionamento

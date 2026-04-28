@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-# ZABBIX — INSTALADOR UNIFICADO (DB + Server + Proxy) — v5.4
+# ZABBIX — INSTALADOR UNIFICADO (DB + Server + Proxy) — v5.5-dev
 # ==============================================================================
 # Componentes disponíveis (um por execução):
 #   1) BASE DE DADOS  — PostgreSQL + TimescaleDB        (DB v1.5)
@@ -16,6 +16,11 @@
 #   • [DB], [SERVER] e [PROXY] indicam onde a mudança aparece.
 #   • A explicação entre parênteses mostra o impacto prático para o operador.
 #   • Termos técnicos foram mantidos quando ajudam a diagnosticar logs/comandos.
+# ------------------------------------------------------------------------------
+#   v5.5-dev — em desenvolvimento
+#         [GERAL] Adicionado --collect-support-bundle para gerar um pacote único
+#           de suporte em /root, com erro estruturado, summaries, Doctor, logs
+#           limitados, status de serviços, portas, pacotes e configs relacionadas.
 # ------------------------------------------------------------------------------
 #   v5.4 — 2026-04-28
 #         [GERAL] Erros fatais agora gravam um JSON operacional em
@@ -1106,7 +1111,7 @@ post_validate_installation() {
 # ------------------------------------------------------------------------------
 VERDE="\e[32m"; AMARELO="\e[33m"; VERMELHO="\e[31m"
 CIANO="\e[36m"; NEGRITO="\e[1m"; RESET="\e[0m"
-INSTALLER_VERSION="v5.4"
+INSTALLER_VERSION="v5.5-dev"
 INSTALLER_LABEL="AUTOMACAO-ZBX-UNIFIED ${INSTALLER_VERSION}"
 
 clear() { printf '\033c' 2>/dev/null || :; }
@@ -1123,6 +1128,7 @@ LIST_SUPPORTED_OS=0
 REPO_CHECK=0
 SAFE_MODE=0
 DEBUG_SERVICES=0
+COLLECT_SUPPORT_BUNDLE=0
 REQUESTED_COMPONENT=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -1136,6 +1142,7 @@ while [[ $# -gt 0 ]]; do
         --repo-check) REPO_CHECK=1; shift ;;
         --safe) SAFE_MODE=1; shift ;;
         --debug-services) DEBUG_SERVICES=1; shift ;;
+        --collect-support-bundle) COLLECT_SUPPORT_BUNDLE=1; shift ;;
         --simulate|-s) SIMULATE_MODE=1; shift ;;
         --wipe) WIPE_MODE=1; shift ;;
         --wipe-db) WIPE_MODE=1; WIPE_DB=1; shift ;;
@@ -1182,6 +1189,7 @@ Opções:
   --repo-check  Valida repositórios e pacotes oficiais do componente sem instalar.
   --safe        Exige confirmação extra antes de limpezas destrutivas.
   --debug-services Diagnostica serviços/portas/processos sem instalar nada.
+  --collect-support-bundle Coleta diagnóstico em um .tar.gz para suporte.
   --mode <modo> Executa direto: db, server ou proxy.
   --wipe        Limpeza completa de Zabbix/Nginx, com confirmação.
   --wipe-db     Limpeza completa incluindo PostgreSQL/TimescaleDB e dados da BD.
@@ -1202,6 +1210,7 @@ Exemplos:
   $0 --list-supported-os Lista sistemas suportados
   $0 server --repo-check Valida repositórios/pacotes do Server sem instalar
   $0 --debug-services Diagnostica serviços sem instalar
+  $0 --collect-support-bundle Gera pacote único para análise de problemas
   $0 --wipe     Remove instalações anteriores no escopo Zabbix/Nginx
   $0 --wipe-db  Remove também PostgreSQL/TimescaleDB e dados da BD
 
@@ -2743,6 +2752,139 @@ run_debug_services() {
     echo -e "\n${VERDE}${NEGRITO}Debug concluído. Nenhuma alteração foi feita.${RESET}\n"
 }
 
+collect_support_bundle() {
+    local stamp bundle tmpdir files_dir logs_dir configs_dir f svc
+    stamp=$(date +%Y%m%d_%H%M%S)
+    bundle="/root/zabbix_support_bundle_${stamp}.tar.gz"
+    tmpdir="$(mktemp -d /tmp/zabbix_support_bundle.XXXXXX)"
+    files_dir="${tmpdir}/files"
+    logs_dir="${tmpdir}/logs"
+    configs_dir="${tmpdir}/configs"
+    mkdir -p "$files_dir" "$logs_dir" "$configs_dir"
+    chmod 700 "$tmpdir" "$files_dir" "$logs_dir" "$configs_dir" 2>/dev/null || true
+
+    {
+        echo "Zabbix Unified Installer - Support Bundle"
+        echo "Gerado em: $(date -Is 2>/dev/null || date)"
+        echo "Instalador: ${INSTALLER_LABEL:-AUTOMACAO-ZBX-UNIFIED}"
+        echo "Sistema: ${OS_DISPLAY:-N/D}"
+        echo "Kernel: $(uname -a 2>/dev/null || echo N/D)"
+        echo "Hostname: $(hostname 2>/dev/null || echo N/D)"
+        echo "Usuario efetivo: ${EUID}"
+        echo
+        echo "ATENCAO: este pacote pode conter credenciais, PSKs e dados sensiveis."
+        echo "Use apenas para suporte e armazene com permissao restrita."
+    } > "${tmpdir}/README_SUPORTE.txt"
+
+    {
+        echo "== Sistema =="
+        timeout 10 uname -a 2>/dev/null || true
+        [[ -r /etc/os-release ]] && timeout 10 sed -n '1,80p' /etc/os-release 2>/dev/null || true
+        echo
+        echo "== Data/hora =="
+        timeout 10 date -Is 2>/dev/null || date 2>/dev/null || true
+        timeout 10 timedatectl 2>/dev/null || true
+        echo
+        echo "== Recursos =="
+        timeout 10 free -m 2>/dev/null || true
+        timeout 10 df -hT 2>/dev/null || true
+        echo
+        echo "== Rede =="
+        timeout 10 ip addr 2>/dev/null || true
+        timeout 10 ip route 2>/dev/null || true
+    } > "${tmpdir}/system.txt"
+
+    {
+        echo "== Servicos =="
+        for svc in postgresql zabbix-server zabbix-proxy zabbix-agent2 nginx php-fpm php8.1-fpm php8.2-fpm php8.3-fpm php8.4-fpm php8.5-fpm; do
+            echo
+            echo "### ${svc}"
+            timeout 10 systemctl status "$svc" --no-pager 2>/dev/null || true
+        done
+    } > "${tmpdir}/services.txt"
+
+    {
+        echo "== Portas =="
+        timeout 10 ss -tulnp 2>/dev/null || true
+        echo
+        echo "== Processos relacionados =="
+        timeout 10 ps aux 2>/dev/null | awk 'NR==1 || /zabbix|postgres|nginx|php.*fpm/' || true
+    } > "${tmpdir}/ports_processes.txt"
+
+    {
+        echo "== Pacotes relacionados =="
+        timeout 20 dpkg -l 2>/dev/null | awk '/^ii|^rc/ && $2 ~ /(zabbix|postgresql|timescaledb|nginx|php)/ {print}' || true
+        echo
+        echo "== APT sources relacionadas =="
+        timeout 10 ls -la /etc/apt/sources.list.d 2>/dev/null || true
+        timeout 10 grep -RHiE 'zabbix|postgresql|timescale|ondrej' /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null || true
+    } > "${tmpdir}/packages_repos.txt"
+
+    for f in \
+        /root/zabbix_install_error.json \
+        /root/zabbix_install_summary.txt \
+        /root/zabbix_install_summary_plain.txt \
+        /root/zabbix_install_summary.json \
+        /root/zabbix_doctor_report.txt \
+        /var/log/zabbix-install/full.log \
+        /var/log/zabbix-install/db.log \
+        /var/log/zabbix-install/server.log \
+        /var/log/zabbix-install/proxy.log; do
+        if [[ -f "$f" ]]; then
+            timeout 10 tail -n 500 "$f" > "${files_dir}/$(basename "$f").tail" 2>/dev/null || true
+        fi
+    done
+
+    for f in \
+        /etc/zabbix/zabbix_server.conf \
+        /etc/zabbix/zabbix_proxy.conf \
+        /etc/zabbix/zabbix_agent2.conf \
+        /etc/zabbix/nginx.conf; do
+        if [[ -f "$f" ]]; then
+            timeout 10 sed -n '1,260p' "$f" > "${configs_dir}/$(basename "$f")" 2>/dev/null || true
+        fi
+    done
+
+    for svc in postgresql zabbix-server zabbix-proxy zabbix-agent2 nginx; do
+        timeout 15 journalctl -u "$svc" --no-pager -n 200 > "${logs_dir}/${svc}.journal.txt" 2>/dev/null || true
+    done
+    for f in \
+        /var/log/zabbix/zabbix_server.log \
+        /var/log/zabbix/zabbix_proxy.log \
+        /var/log/zabbix/zabbix_agent2.log \
+        /var/log/nginx/error.log \
+        /var/log/nginx/access.log \
+        /var/log/postgresql/*.log; do
+        [[ -f "$f" ]] || continue
+        timeout 10 tail -n 500 "$f" > "${logs_dir}/$(basename "$f").tail" 2>/dev/null || true
+    done
+
+    {
+        echo "{"
+        printf '  "created_at": "%s",\n' "$(date -Is 2>/dev/null || date)"
+        printf '  "installer_version": "%s",\n' "${INSTALLER_VERSION:-unknown}"
+        printf '  "host": "%s",\n' "$(hostname 2>/dev/null || echo unknown)"
+        printf '  "bundle": "%s",\n' "$bundle"
+        printf '  "contains_sensitive_data": true\n'
+        echo "}"
+    } > "${tmpdir}/manifest.json"
+
+    if ! command -v tar >/dev/null 2>&1; then
+        echo -e "${VERMELHO}${NEGRITO}ERRO:${RESET} comando tar não encontrado; não foi possível gerar o pacote."
+        rm -rf "$tmpdir"
+        exit 1
+    fi
+    tar -czf "$bundle" -C "$tmpdir" . 2>/dev/null
+    chmod 600 "$bundle" 2>/dev/null || true
+    rm -rf "$tmpdir"
+
+    echo -e "\n${VERDE}${NEGRITO}Pacote de suporte gerado com sucesso.${RESET}"
+    printf "  %-34s %s\n" "Arquivo:" "$bundle"
+    printf "  %-34s %s\n" "Permissão:" "600"
+    echo -e "  ${AMARELO}Atenção:${RESET} este pacote pode conter credenciais e PSKs."
+    echo -e "  Envie este arquivo quando precisar analisar erro de instalação ou diagnóstico.\n"
+}
+
 show_dry_run_plan() {
     local component="$1"
     clear
@@ -3000,6 +3142,7 @@ run_doctor_mode() {
 [[ "$LIST_VERSIONS" == "1" ]] && { show_supported_versions; exit 0; }
 [[ "$LIST_SUPPORTED_OS" == "1" ]] && { show_supported_os; exit 0; }
 validate_supported_ubuntu_any_component
+[[ "$COLLECT_SUPPORT_BUNDLE" == "1" ]] && { collect_support_bundle; exit 0; }
 [[ "$DEBUG_SERVICES" == "1" ]] && { run_debug_services; exit 0; }
 [[ "$WIPE_MODE" == "1" ]] && { run_wipe_mode; exit 0; }
 [[ "$CHECK_ONLY" == "1" ]] && { run_check_mode; exit 0; }
@@ -3018,7 +3161,7 @@ cat << "EOF"
 ███████╗██║  ██║██████╔╝██████╔╝██║██╔╝ ██╗
 ╚══════╝╚═╝  ╚═╝╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═╝
 EOF
-echo -e "        INSTALADOR UNIFICADO — Enterprise Suite v5.3${RESET}"
+echo -e "        INSTALADOR UNIFICADO — Enterprise Suite ${INSTALLER_VERSION}${RESET}"
 echo -e "        ${CIANO}Zabbix Unified Installer — By Denys Gonçalves${RESET}"
 echo -e "        ${VERDE}Sistema detetado: ${OS_DISPLAY}${RESET}"
 echo -e "        ${CIANO}Hardware: ${RAM_MB} MB RAM | ${CPU_CORES} núcleos CPU${RESET}\n"

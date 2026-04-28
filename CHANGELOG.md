@@ -2,6 +2,10 @@
 
 Todas as versoes oficiais deste projeto sao publicadas por tag Git e GitHub Release.
 
+## main - v5.5-dev
+
+- Adicionado modo `--collect-support-bundle`, que gera um pacote `.tar.gz` em `/root` com resumo da instalacao, erro estruturado, Doctor, logs limitados, status de servicos, portas, pacotes e configuracoes relacionadas.
+
 ## v5.4 - 2026-04-28
 
 Primeira versao oficial publicada no repositorio `denysg001/zabbix-unified-installer`.
