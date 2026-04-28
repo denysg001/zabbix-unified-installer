@@ -2380,6 +2380,7 @@ doctor_scan_common_log_errors() {
         done < <(echo "$patterns" | tr '|' '\n')
     done
     [[ "$found" == "0" ]] && echo -e "  ${VERDE}✔ Nenhum padrão crítico conhecido encontrado nos logs verificados.${RESET}"
+    return 0
 }
 
 run_doctor_mode() {

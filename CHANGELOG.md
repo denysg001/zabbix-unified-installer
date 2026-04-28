@@ -18,6 +18,7 @@ Todas as versoes oficiais deste projeto sao publicadas por tag Git e GitHub Rele
 - Separada ativação de `zabbix-proxy` e `zabbix-agent2`, com diagnóstico do serviço no log quando algum deles falhar.
 - Removido uso ativo de `EnableRemoteCommands`/`AllowKey` no Proxy, evitando parâmetros inválidos em versões atuais; `AllowKey` permanece restrito ao Agent 2.
 - Garantido `LogFile` no Proxy quando `LogType=file`, evitando falha de inicialização por configuração de log incompleta.
+- Corrigido Doctor para não gerar erro fatal quando encontra padrões conhecidos em logs; agora mantém o resultado como aviso.
 - README reorganizado como página principal do projeto, com requisitos, instalação rápida, features, screenshots planejados, política de versionamento e licença.
 - Adicionada licença MIT.
 
