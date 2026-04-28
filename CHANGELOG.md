@@ -16,7 +16,8 @@ Todas as versoes oficiais deste projeto sao publicadas por tag Git e GitHub Rele
 - Corrigida contagem de políticas TimescaleDB para diferenciar políticas aplicadas de políticas ignoradas pela versão/configuração atual.
 - Recuperados conffiles do Proxy/Agent em reinstalações parciais antes de aplicar configuração.
 - Separada ativação de `zabbix-proxy` e `zabbix-agent2`, com diagnóstico do serviço no log quando algum deles falhar.
-- Removido uso ativo de `EnableRemoteCommands` no Proxy, evitando parâmetro legado em versões atuais; quando solicitado, usa `AllowKey=system.run[*]`.
+- Removido uso ativo de `EnableRemoteCommands`/`AllowKey` no Proxy, evitando parâmetros inválidos em versões atuais; `AllowKey` permanece restrito ao Agent 2.
+- Garantido `LogFile` no Proxy quando `LogType=file`, evitando falha de inicialização por configuração de log incompleta.
 - README reorganizado como página principal do projeto, com requisitos, instalação rápida, features, screenshots planejados, política de versionamento e licença.
 - Adicionada licença MIT.
 
