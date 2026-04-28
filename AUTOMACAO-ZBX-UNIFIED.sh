@@ -78,8 +78,12 @@ safe_count_matches() {
 sanitize_plain_text() {
     local tmp
     tmp="$(mktemp /tmp/zabbix_sanitize.XXXXXX 2>/dev/null || echo /tmp/zabbix_sanitize.$$)"
-    sed -r 's/\x1B\[[0-9;?]*[ -/]*[@-~]//g; s/\r//g' 2>/dev/null \
-        | tr -d '\000-\010\013\014\016-\037\177' > "$tmp" 2>/dev/null || true
+    LC_ALL=C awk '{
+        gsub(/\033\[[0-9;?]*[ -\/]*[@-~]/, "")
+        gsub(/\r/, "")
+        gsub(/[\001-\010\013\014\016-\037\177]/, "")
+        print
+    }' > "$tmp" 2>/dev/null || true
     if command -v iconv >/dev/null 2>&1; then
         iconv -f UTF-8 -t UTF-8 -c "$tmp" 2>/dev/null || cat "$tmp" 2>/dev/null || true
     else
