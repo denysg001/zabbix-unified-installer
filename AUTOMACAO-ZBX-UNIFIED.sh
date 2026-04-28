@@ -573,6 +573,11 @@ auto_repair_apt() {
 set_config() {
     local file=$1 param=$2 value=$3
     if [ ! -f "$file" ]; then
+        mkdir -p "$(dirname "$file")" 2>/dev/null || true
+        touch "$file" 2>/dev/null || {
+            echo "Arquivo de configuração não encontrado e não foi possível criar: ${file}" >&2
+            return 1
+        }
         [[ -n "$value" ]] && echo "${param}=${value}" >> "$file"
         return
     fi
@@ -4446,6 +4451,23 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
         "php${PHP_VER}-mbstring" "php${PHP_VER}-gd" "php${PHP_VER}-xml" \
         "php${PHP_VER}-ldap" "php${PHP_VER}-curl" "php${PHP_VER}-zip"
 
+    ensure_server_config_files() {
+        local missing=0 pkg
+        for pkg in zabbix-server-pgsql zabbix-nginx-conf; do
+            apt-get install "${APT_FLAGS[@]}" --reinstall -o Dpkg::Options::="--force-confmiss" "$pkg" >/dev/null
+        done
+        if [[ ! -f /etc/zabbix/zabbix_server.conf ]]; then
+            echo "Arquivo /etc/zabbix/zabbix_server.conf ausente após reinstalação do pacote." >&2
+            missing=1
+        fi
+        if [[ ! -f /etc/zabbix/nginx.conf ]]; then
+            echo "Arquivo /etc/zabbix/nginx.conf ausente após reinstalação do pacote." >&2
+            missing=1
+        fi
+        [[ "$missing" == "0" ]]
+    }
+    run_step "Validando arquivos de configuração do Zabbix Server" ensure_server_config_files
+
     run_step "Gerando locales pt_BR.UTF-8 e en_US.UTF-8" bash -c \
         "locale-gen pt_BR.UTF-8 en_US.UTF-8 && update-locale"
 
@@ -4568,17 +4590,37 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
             #   tendências → comprimir chunks com mais de 1 dia
             # if_not_exists=true: idempotente, não falha se a política já existir
             local _ok=0 _total=0
+            _configure_one_tsdb_policy() {
+                local table="$1" interval="$2"
+                psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" \
+                    -v ON_ERROR_STOP=1 -qAt <<SQL >> "$LOG_FILE" 2>&1
+DO \$\$
+BEGIN
+    BEGIN
+        EXECUTE format('ALTER TABLE %I SET (timescaledb.compress, timescaledb.compress_segmentby = ''itemid'')', '${table}');
+    EXCEPTION WHEN OTHERS THEN
+        BEGIN
+            EXECUTE format('ALTER TABLE %I SET (timescaledb.enable_columnstore = true)', '${table}');
+        EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE 'TimescaleDB compression/columnstore not enabled for ${table}: %', SQLERRM;
+        END;
+    END;
+    BEGIN
+        PERFORM add_compression_policy('${table}', INTERVAL '${interval}', if_not_exists => true);
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'TimescaleDB compression policy skipped for ${table}: %', SQLERRM;
+    END;
+END
+\$\$;
+SQL
+            }
             for _t in history history_uint history_str history_log history_text; do
                 _total=$((_total+1))
-                psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" \
-                    -c "SELECT add_compression_policy('${_t}', INTERVAL '7 days', if_not_exists => true);" \
-                    >> "$LOG_FILE" 2>&1 && _ok=$((_ok+1)) || true
+                _configure_one_tsdb_policy "$_t" "7 days" && _ok=$((_ok+1)) || true
             done
             for _t in trends trends_uint; do
                 _total=$((_total+1))
-                psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" \
-                    -c "SELECT add_compression_policy('${_t}', INTERVAL '1 day', if_not_exists => true);" \
-                    >> "$LOG_FILE" 2>&1 && _ok=$((_ok+1)) || true
+                _configure_one_tsdb_policy "$_t" "1 day" && _ok=$((_ok+1)) || true
             done
             echo -e "  ${VERDE}Políticas aplicadas: ${_ok}/${_total} tabelas (histórico ≥7d | tendências ≥1d)${RESET}"
         }

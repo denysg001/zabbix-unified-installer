@@ -11,6 +11,8 @@ Todas as versoes oficiais deste projeto sao publicadas por tag Git e GitHub Rele
 - Protegido `timescaledb-tune` em container/LXC para evitar tuning baseado na RAM do host; o instalador aplica limites seguros pela RAM detectada no container.
 - Melhorada espera do PostgreSQL na camada DB usando readiness do cluster, reduzindo falso erro do serviço genérico em ambientes LXC.
 - Corrigido falso aviso do Doctor/pós-validação quando `postgresql.service` genérico aparece inativo, mas o cluster PostgreSQL está respondendo.
+- Recuperados conffiles do Server (`zabbix_server.conf` e `nginx.conf`) em reinstalações parciais antes de aplicar configuração.
+- Ajustada configuração opcional de compressão/columnstore TimescaleDB para não despejar erros críticos no log quando a política não é suportada pela combinação instalada.
 - README reorganizado como página principal do projeto, com requisitos, instalação rápida, features, screenshots planejados, política de versionamento e licença.
 - Adicionada licença MIT.
 
