@@ -51,60 +51,39 @@ Permissoes:
 
 ## Instalacao Rapida
 
-Se ja estiver logado como `root` (comum em Debian minimo), use os comandos sem
-`sudo`. Se estiver em um usuario administrativo no Ubuntu, pode usar `sudo`.
+A forma recomendada de instalacao e via Git. Ela funciona melhor em ambientes
+minimos, evita depender de `curl` antes do bootstrap e facilita atualizar o
+instalador depois com `git pull`.
 
-One-liner latest, a partir do branch `main`, como `root`:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/main/AUTOMACAO-ZBX-UNIFIED.sh | bash
-```
-
-One-liner latest com `sudo`:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/main/AUTOMACAO-ZBX-UNIFIED.sh | sudo bash
-```
-
-One-liner versao fixa `v5.5`, como `root`:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/v5.5/AUTOMACAO-ZBX-UNIFIED.sh | bash
-```
-
-One-liner versao fixa `v5.5` com `sudo`:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/v5.5/AUTOMACAO-ZBX-UNIFIED.sh | sudo bash
-```
-
-Forma auditavel, baixando o arquivo antes de executar:
-
-Latest, a partir do branch `main`:
-
-```bash
-curl -fsSL -o AUTOMACAO-ZBX-UNIFIED.sh \
-  https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/main/AUTOMACAO-ZBX-UNIFIED.sh
-chmod +x AUTOMACAO-ZBX-UNIFIED.sh
-./AUTOMACAO-ZBX-UNIFIED.sh
-```
-
-Versao fixa, reproduzivel por tag:
-
-```bash
-curl -fsSL -o AUTOMACAO-ZBX-UNIFIED.sh \
-  https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/v5.5/AUTOMACAO-ZBX-UNIFIED.sh
-chmod +x AUTOMACAO-ZBX-UNIFIED.sh
-./AUTOMACAO-ZBX-UNIFIED.sh
-```
-
-Via clone:
+Como `root`:
 
 ```bash
 git clone https://github.com/denysg001/zabbix-unified-installer.git
 cd zabbix-unified-installer
 ./AUTOMACAO-ZBX-UNIFIED.sh
 ```
+
+Se estiver no Ubuntu com um usuario administrativo, entre como root antes de
+executar:
+
+```bash
+sudo -i
+cd /caminho/onde/quer/baixar
+git clone https://github.com/denysg001/zabbix-unified-installer.git
+cd zabbix-unified-installer
+./AUTOMACAO-ZBX-UNIFIED.sh
+```
+
+Para atualizar o instalador antes de uma nova execucao:
+
+```bash
+cd zabbix-unified-installer
+git pull
+./AUTOMACAO-ZBX-UNIFIED.sh
+```
+
+Se o sistema minimo ainda nao tiver Git instalado, instale primeiro pelo gerenciador
+de pacotes da propria distribuicao, por exemplo `apt-get install -y git`.
 
 ## Modos Diretos
 
@@ -199,23 +178,25 @@ Este e o unico arquivo que deve receber desenvolvimento normal.
 
 Nao ha necessidade de manter copias do script dentro do repositorio para versionar releases. Versoes oficiais devem ser recuperadas por tags Git e GitHub Releases.
 
-## Latest Vs Versao Fixa
+## Atualizacao E Versao Fixa
 
-Use `main` quando quiser a versao mais recente em desenvolvimento:
+Use `main` quando quiser receber as correcoes mais recentes:
 
-```text
-https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/main/AUTOMACAO-ZBX-UNIFIED.sh
+```bash
+cd zabbix-unified-installer
+git pull
 ```
 
-Use uma tag quando quiser uma versao fixa e reproduzivel:
+Use uma tag quando quiser travar em uma versao publicada e reproduzivel:
 
-```text
-https://raw.githubusercontent.com/denysg001/zabbix-unified-installer/v5.5/AUTOMACAO-ZBX-UNIFIED.sh
+```bash
+git fetch --tags
+git checkout v5.5
 ```
 
 Regra operacional:
 
-- `main`: pode receber correcoes novas.
+- `main`: recebe correcoes novas.
 - `vX.Y`: nao muda depois de publicada.
 
 ## Politica De Versionamento
