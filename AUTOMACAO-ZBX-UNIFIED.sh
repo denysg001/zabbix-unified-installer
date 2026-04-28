@@ -1080,7 +1080,7 @@ write_install_summary_json() {
     frontend_url=""
     [[ -n "${HOST_IP:-}" && -n "${NGINX_PORT:-}" ]] && frontend_url="$([[ "${USE_HTTPS:-0}" == "1" ]] && echo "https" || echo "http")://${HOST_IP}:${NGINX_PORT}"
     tsdb_active="false"
-    [[ "${TSDB_AVAILABLE:-0}" == "1" || "${USE_TIMESCALE:-0}" == "1" ]] && tsdb_active="true"
+    [[ -n "${TSDB_EXT_VER:-}" && "${TSDB_EXT_VER:-N/D}" != "N/D" ]] && tsdb_active="true"
     tsdb_version="${TSDB_EXT_VER:-${TSDB_PKG_VER:-}}"
     psk_id="${PSK_AGENT_ID:-${PSK_PROXY_ID:-}}"
     psk_secret="${PSK_AGENT_KEY:-${PSK_PROXY_KEY:-}}"
@@ -2556,7 +2556,7 @@ run_doctor_mode() {
                     echo -e "  ${AMARELO}⚠${RESET} PSK não configurado"
             fi
             if type -P psql >/dev/null 2>&1; then
-                safe_diag_cmd postgres_psql -tAc "SELECT version();" | sed 's/^/  PostgreSQL: /' || true
+                postgres_psql_timeout 10 -tAc "SELECT version();" 2>/dev/null | sed 's/^/  PostgreSQL: /' || true
                 echo -e "\n${CIANO}${NEGRITO}▸ TIMESCALEDB${RESET}"
                 local tsdb_info tsdb_db
                 # Determina o nome da BD: lê do zabbix_server.conf se existir, senão usa "zabbix"
@@ -2565,9 +2565,9 @@ run_doctor_mode() {
                     tsdb_db=$(timeout 10 awk -F'=' '/^DBName[[:space:]]*=/{gsub(/[[:space:]]/,"",$2); print $2}' \
                         /etc/zabbix/zabbix_server.conf 2>/dev/null | head -1 || true)
                 [[ -z "$tsdb_db" ]] && tsdb_db="zabbix"
-                tsdb_info=$(safe_diag_cmd postgres_psql -d "$tsdb_db" -tAc \
+                tsdb_info=$(postgres_psql_timeout 10 -d "$tsdb_db" -tAc \
                     "SELECT extname || ' ' || extversion FROM pg_extension WHERE extname='timescaledb';" \
-                    | xargs || true)
+                    2>/dev/null | xargs || true)
                 if [[ -n "$tsdb_info" ]]; then
                     echo -e "  ${VERDE}✔${RESET} Extensão carregada: ${tsdb_info} (BD: ${tsdb_db})"
                 else

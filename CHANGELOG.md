@@ -4,6 +4,8 @@ Todas as versoes oficiais deste projeto sao publicadas por tag Git e GitHub Rele
 
 **main - apos v5.5**
 
+- Corrigido falso aviso do Doctor em Debian/Ubuntu: consultas locais ao PostgreSQL agora usam o executor com timeout próprio, sem passar função Bash diretamente para `timeout`.
+- `timescaledb_active` no JSON agora reflete a extensão carregada na base, não apenas a disponibilidade/instalação do pacote.
 - Corrigidas chamadas internas ao PostgreSQL em Debian mínimo: o instalador não depende mais de `sudo -u postgres`; quando executado como root usa `runuser`, valida sua presença no pré-check e mantém `sudo` apenas como fallback.
 - Corrigida geração de locales em Debian mínimo: `en_US.UTF-8` e `pt_BR.UTF-8` agora são habilitados em `/etc/locale.gen` antes do `locale-gen`, e falha de locale vira aviso em vez de abortar a instalação.
 - Troca de fuso horário agora usa menu validado com opções prontas (`America/Sao_Paulo`, `UTC`, manter detectado ou outro fuso validado), evitando erro por digitação incorreta.
