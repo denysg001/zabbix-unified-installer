@@ -274,6 +274,20 @@ wait_for_service_active() {
     return 1
 }
 
+postgres_is_ready() {
+    local pg_ver="${1:-${PG_VER:-}}" cluster="${2:-${PG_CLUSTER_NAME:-main}}"
+    if command -v pg_isready >/dev/null 2>&1 && timeout 5 pg_isready -q -h /var/run/postgresql -p 5432 2>/dev/null; then
+        return 0
+    fi
+    if [[ -n "$pg_ver" ]] && systemctl is-active --quiet "postgresql@${pg_ver}-${cluster}" 2>/dev/null; then
+        return 0
+    fi
+    if systemctl is-active --quiet postgresql 2>/dev/null; then
+        return 0
+    fi
+    return 1
+}
+
 _CRITICAL_SERVICES_OK=1
 
 post_validate_installation() {
@@ -297,7 +311,16 @@ post_validate_installation() {
     log_msg "INFO" "Iniciando pós-validação do componente ${component}"
     case "$component" in
         db)
-            _validate_critical postgresql
+            if postgres_is_ready "${PG_VER:-}" "${PG_CLUSTER_NAME:-main}"; then
+                echo -e "  ${VERDE}✔${RESET} PostgreSQL: pronto"
+                log_msg "OK" "PostgreSQL pronto"
+            else
+                echo -e "  ${VERMELHO}${NEGRITO}✖${RESET} PostgreSQL: não está pronto"
+                log_msg "WARN" "PostgreSQL não está pronto"
+                print_service_journal_tail "postgresql@${PG_VER:-17}-${PG_CLUSTER_NAME:-main}" 20
+                print_service_journal_tail postgresql 20
+                _CRITICAL_SERVICES_OK=0
+            fi
             check_tcp_listen 5432 "PostgreSQL"
             [[ "${INSTALL_AGENT:-0}" == "1" ]] && _validate_critical zabbix-agent2
             ;;
@@ -2374,7 +2397,15 @@ run_doctor_mode() {
     LOG_FILE=""
     case "$component" in
         db)
-            validate_service_active postgresql
+            if postgres_is_ready "${PG_VER:-}" "${PG_CLUSTER_NAME:-main}"; then
+                echo -e "  ${VERDE}✔${RESET} PostgreSQL: pronto/respondendo"
+            else
+                echo -e "  ${AMARELO}⚠${RESET} PostgreSQL: não respondeu ao diagnóstico local"
+                echo -e "  Diagnóstico: journalctl -u postgresql -n 80 --no-pager"
+                print_service_journal_tail "postgresql@${PG_VER:-17}-${PG_CLUSTER_NAME:-main}" 20
+                print_service_journal_tail postgresql 20
+                DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
+            fi
             if pkg_is_installed "postgresql" || pkg_is_installed "postgresql-${PG_VER:-17}"; then
                 echo -e "  ${VERDE}✔${RESET} Pacote PostgreSQL instalado"
             else
