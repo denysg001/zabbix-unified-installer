@@ -6,4 +6,4 @@ zabbix_install_error.json
 zabbix_install_summary*.txt
 zabbix_install_summary*.json
 zabbix_doctor_report*.txt
-
+dist/

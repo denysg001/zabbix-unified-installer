@@ -1,4 +1,4 @@
-.PHONY: all lint check test
+.PHONY: all lint check test build
 
 all: lint check test
 
@@ -11,3 +11,6 @@ check:
 
 test:
 	bats tests/
+
+build:
+	./build.sh
