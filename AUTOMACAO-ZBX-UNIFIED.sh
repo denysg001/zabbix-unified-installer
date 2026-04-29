@@ -1890,6 +1890,18 @@ check_bootstrap_downloader() {
     fi
 }
 
+setup_timezone_ntp() {
+    local target_timezone="$1"
+    # Em containers LXC o relógio é gerido pelo host — tentar alterar causa erro fatal.
+    # systemd-detect-virt -c retorna 0 (verdadeiro) se for qualquer container (LXC, Docker, etc).
+    if ! systemd-detect-virt -c -q 2>/dev/null; then
+        run_step "Ajustando relógio (${target_timezone})" timedatectl set-timezone "${target_timezone}"
+        run_step "Ativando motor NTP" systemctl enable --now systemd-timesyncd
+    else
+        echo -e "\n  ${AMARELO}⚠ Ambiente de container (LXC) detectado. Pulando configuração de NTP (gerido pelo Host).${RESET}"
+    fi
+}
+
 port_process_info() {
     local port="$1" raw proc pid_count suffix
     if command -v ss >/dev/null 2>&1; then
@@ -3335,14 +3347,7 @@ EOF
             "rm -rf /etc/postgresql /var/lib/postgresql /var/log/postgresql /run/postgresql 2>/dev/null || true; rm -f /tmp/zbx_repo.deb /etc/apt/sources.list.d/zabbix*.list /etc/apt/sources.list.d/zabbix*.sources /etc/apt/sources.list.d/pgdg.list /etc/apt/sources.list.d/timescaledb.list /etc/apt/trusted.gpg.d/timescaledb.gpg /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc 2>/dev/null || true"
     fi
 
-    # Em containers LXC o relógio é gerido pelo host — tentar alterar causa erro fatal.
-    # systemd-detect-virt -c retorna 0 (verdadeiro) se for qualquer container (LXC, Docker, etc).
-    if ! systemd-detect-virt -c -q 2>/dev/null; then
-        run_step "Ajustando relógio (${DB_TIMEZONE})" timedatectl set-timezone "${DB_TIMEZONE}"
-        run_step "Ativando motor NTP" systemctl enable --now systemd-timesyncd
-    else
-        echo -e "\n  ${AMARELO}⚠ Ambiente de container (LXC) detectado. Pulando configuração de NTP (gerido pelo Host).${RESET}"
-    fi
+    setup_timezone_ntp "$DB_TIMEZONE"
     run_step "Destravando processos do APT" auto_repair_apt
     run_step "Atualizando caches locais" apt-get update
     [[ "$SIMULATE_MODE" != "1" ]] && validate_packages_available \
@@ -4657,14 +4662,7 @@ EOF
             "rm -rf /etc/zabbix /var/lib/zabbix /var/log/zabbix /run/zabbix /tmp/zabbix_* 2>/dev/null || true; rm -f /tmp/zbx_repo.deb /etc/apt/sources.list.d/zabbix*.list /etc/apt/sources.list.d/zabbix*.sources /etc/apt/sources.list.d/pgdg.list /etc/apt/sources.list.d/timescaledb.list /etc/apt/trusted.gpg.d/timescaledb.gpg /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc 2>/dev/null || true"
     fi
 
-    # Em containers LXC o relógio é gerido pelo host — tentar alterar causa erro fatal.
-    # systemd-detect-virt -c retorna 0 (verdadeiro) se for qualquer container (LXC, Docker, etc).
-    if ! systemd-detect-virt -c -q 2>/dev/null; then
-        run_step "Ajustando relógio (${TIMEZONE})" timedatectl set-timezone "${TIMEZONE}"
-        run_step "Ativando motor NTP" systemctl enable --now systemd-timesyncd
-    else
-        echo -e "\n  ${AMARELO}⚠ Ambiente de container (LXC) detectado. Pulando configuração de NTP (gerido pelo Host).${RESET}"
-    fi
+    setup_timezone_ntp "$TIMEZONE"
     run_step "Destravando processos do APT" auto_repair_apt
     run_step "Atualizando caches locais" apt-get update
 
@@ -5686,14 +5684,7 @@ EOF
             "rm -rf /etc/zabbix /var/lib/zabbix /var/log/zabbix /run/zabbix /tmp/zabbix_* 2>/dev/null || true; rm -f /tmp/zbx_repo.deb /etc/apt/sources.list.d/zabbix*.list /etc/apt/sources.list.d/zabbix*.sources /etc/apt/sources.list.d/pgdg.list /etc/apt/sources.list.d/timescaledb.list /etc/apt/trusted.gpg.d/timescaledb.gpg /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc 2>/dev/null || true"
     fi
 
-    # Em containers LXC o relógio é gerido pelo host — tentar alterar causa erro fatal.
-    # systemd-detect-virt -c retorna 0 (verdadeiro) se for qualquer container (LXC, Docker, etc).
-    if ! systemd-detect-virt -c -q 2>/dev/null; then
-        run_step "Ajustando relógio (${PROXY_TIMEZONE})" timedatectl set-timezone "${PROXY_TIMEZONE}"
-        run_step "Ativando motor NTP" systemctl enable --now systemd-timesyncd
-    else
-        echo -e "\n  ${AMARELO}⚠ Ambiente de container (LXC) detectado. Pulando configuração de NTP (gerido pelo Host).${RESET}"
-    fi
+    setup_timezone_ntp "$PROXY_TIMEZONE"
     run_step "Destravando processos do APT" auto_repair_apt
     run_step "Atualizando caches locais" apt-get update
     [[ "$SIMULATE_MODE" != "1" ]] && validate_packages_available curl wget sqlite3 openssl
