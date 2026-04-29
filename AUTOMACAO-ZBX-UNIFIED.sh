@@ -156,7 +156,7 @@ sanitize_plain_text() {
     rm -f "$tmp" 2>/dev/null || true
 }
 
-curl() {
+_curl() {
     local has_max_time=0 arg
     for arg in "$@"; do
         [[ "$arg" == "--max-time" || "$arg" == -m || "$arg" == --max-time=* ]] && has_max_time=1
@@ -168,7 +168,7 @@ curl() {
     fi
 }
 
-wget() {
+_wget() {
     command wget --timeout=10 --tries=3 "$@"
 }
 
@@ -283,7 +283,7 @@ check_frontend_http() {
     local attempt tmp_body http_code
     tmp_body=$(mktemp)
     for attempt in 1 2 3; do
-        http_code=$(curl -k -L -sS --max-time 10 -o "$tmp_body" -w "%{http_code}" "$url" 2>/dev/null || true)
+        http_code=$(_curl -k -L -sS --max-time 10 -o "$tmp_body" -w "%{http_code}" "$url" 2>/dev/null || true)
         if [[ "$http_code" =~ ^[23][0-9][0-9]$ ]]; then
             echo -e "  ${VERDE}✔${RESET} Frontend Zabbix: resposta local OK (${url})"
             if grep -qiE 'zabbix|zbx_session|frontends|dashboard|signin|login' "$tmp_body" 2>/dev/null; then
@@ -1468,7 +1468,7 @@ validate_official_zabbix_package() {
     cache_file="${VALIDATION_CACHE_DIR}/zabbix_${OS_FAMILY}_${U_CODENAME}_${version}_$(dpkg --print-architecture 2>/dev/null || echo amd64).Packages"
     if [[ -s "$cache_file" && $(( $(date +%s) - $(stat -c %Y "$cache_file" 2>/dev/null || echo 0) )) -lt 1800 ]]; then
         package_index="$(cat "$cache_file" 2>/dev/null || true)"
-    elif ! package_index="$(curl -fsL --max-time 25 "$index_url" 2>/dev/null | timeout 10 gzip -dc 2>/dev/null)"; then
+    elif ! package_index="$(_curl -fsL --max-time 25 "$index_url" 2>/dev/null | timeout 10 gzip -dc 2>/dev/null)"; then
         echo -e "\n${VERMELHO}${NEGRITO}ERRO:${RESET} não foi possível consultar o índice oficial do Zabbix antes de alterar o APT."
         echo -e "  URL testada: ${index_url}"
         echo -e "  Sistema: ${OS_DISPLAY}"
@@ -1558,7 +1558,7 @@ validate_remote_packages_index() {
     cache_file="${VALIDATION_CACHE_DIR}/${cache_key}"
     if [[ -s "$cache_file" && $(( $(date +%s) - $(stat -c %Y "$cache_file" 2>/dev/null || echo 0) )) -lt 1800 ]]; then
         package_index="$(cat "$cache_file" 2>/dev/null || true)"
-    elif ! package_index="$(curl -fsL --max-time 30 "$url" 2>/dev/null | timeout 10 gzip -dc 2>/dev/null)"; then
+    elif ! package_index="$(_curl -fsL --max-time 30 "$url" 2>/dev/null | timeout 10 gzip -dc 2>/dev/null)"; then
         echo -e "${VERMELHO}${NEGRITO}ERRO:${RESET} não foi possível ler índice oficial: ${label}"
         echo -e "  URL: ${url}"
         exit 1
@@ -1780,7 +1780,7 @@ print_support_commands() {
 }
 
 check_zabbix_repo_url() {
-    if ! curl -fsI --max-time 15 "$REPO_URL" >/dev/null 2>&1; then
+    if ! _curl -fsI --max-time 15 "$REPO_URL" >/dev/null 2>&1; then
         echo -e "\n${VERMELHO}${NEGRITO}ERRO:${RESET} Repositório Zabbix não encontrado para:"
         echo -e "  Zabbix ${ZBX_VERSION} + ${OS_DISPLAY}"
         echo -e "  URL testada: ${REPO_URL}"
@@ -2231,7 +2231,7 @@ run_check_mode() {
 
     echo -e "\n${CIANO}${NEGRITO}▸ CONECTIVIDADE BÁSICA${RESET}"
     for url in "https://repo.zabbix.com" "https://apt.postgresql.org" "https://packagecloud.io"; do
-        if curl -fsI --max-time 10 "$url" >/dev/null 2>&1; then
+        if _curl -fsI --max-time 10 "$url" >/dev/null 2>&1; then
             echo -e "  ${VERDE}✔${RESET} $url acessível"
         else
             echo -e "  ${AMARELO}⚠${RESET} $url não respondeu ao teste rápido"
@@ -2244,7 +2244,7 @@ run_check_mode() {
         local test_url
         test_url="$(zabbix_release_url "$zbx_ver" 2>/dev/null || true)"
         [[ -z "$test_url" ]] && continue
-        if curl -fsI --max-time 10 "$test_url" >/dev/null 2>&1; then
+        if _curl -fsI --max-time 10 "$test_url" >/dev/null 2>&1; then
             echo -e "  ${VERDE}✔${RESET} Zabbix ${zbx_ver} disponível para ${OS_LABEL} ${U_VER}"
             zbx_ok=1
         else
@@ -3415,7 +3415,7 @@ EOF
         ZBX_VERSION="$ZBX_AGENT_VERSION"
         run_step "Validando URL do repositório Zabbix ${ZBX_AGENT_VERSION} para Agent 2" check_zabbix_repo_url
         [[ "$SIMULATE_MODE" != "1" ]] && validate_official_zabbix_package zabbix-agent2 "$ZBX_AGENT_VERSION"
-        run_step "Baixando repositório oficial Zabbix ${ZBX_AGENT_VERSION}" wget -q "$REPO_URL" -O /tmp/zbx_repo.deb
+        run_step "Baixando repositório oficial Zabbix ${ZBX_AGENT_VERSION}" _wget -q "$REPO_URL" -O /tmp/zbx_repo.deb
         run_step "Registando repositório Zabbix para Agent 2" dpkg --force-confmiss -i /tmp/zbx_repo.deb
         run_step "Sincronizando repositório Zabbix" apt-get update
         run_step "Verificando acesso ao repositório Zabbix ${ZBX_AGENT_VERSION}" verify_zabbix_repo_active zabbix-agent2
@@ -3424,7 +3424,7 @@ EOF
 
     setup_pgdg_repo() {
         install -d /usr/share/postgresql-common/pgdg
-        curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+        _curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
             https://www.postgresql.org/media/keys/ACCC4CF8.asc
         echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
 https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
@@ -3444,7 +3444,7 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
         local tsdb_os
         tsdb_os="$(timescale_repo_os)"
         echo -e "\n  ${CIANO}Verificando disponibilidade do repositório TimescaleDB para ${OS_LABEL} ${U_VER} (${U_CODENAME})...${RESET}"
-        if ! curl -fsL --max-time 15 \
+        if ! _curl -fsL --max-time 15 \
             "https://packagecloud.io/timescale/timescaledb/${tsdb_os}/dists/${U_CODENAME}/Release" \
             >/dev/null 2>&1; then
             TSDB_AVAILABLE=0
@@ -3463,7 +3463,7 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
     if [[ "$TSDB_AVAILABLE" == "1" ]]; then
         setup_tsdb_repo() {
             # --batch --yes: evita prompt "File exists. Overwrite?" em reinstalações
-            curl -fsSL https://packagecloud.io/timescale/timescaledb/gpgkey \
+            _curl -fsSL https://packagecloud.io/timescale/timescaledb/gpgkey \
                 | gpg --batch --yes --dearmor -o /etc/apt/trusted.gpg.d/timescaledb.gpg
             echo "deb https://packagecloud.io/timescale/timescaledb/$(timescale_repo_os)/ ${U_CODENAME} main" \
                 > /etc/apt/sources.list.d/timescaledb.list
@@ -4720,7 +4720,7 @@ EOF
 
     setup_pgdg_repo() {
         install -d /usr/share/postgresql-common/pgdg
-        curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+        _curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
             https://www.postgresql.org/media/keys/ACCC4CF8.asc
         echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
 https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
@@ -4741,7 +4741,7 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
     fi
     run_step "Validando URL do repositório Zabbix ${ZBX_VERSION}" check_zabbix_repo_url
     [[ "$SIMULATE_MODE" != "1" ]] && validate_official_zabbix_package zabbix-server-pgsql "$ZBX_VERSION"
-    run_step "Baixando repositório oficial Zabbix ${ZBX_VERSION}" wget -q "$REPO_URL" -O /tmp/zbx_repo.deb
+    run_step "Baixando repositório oficial Zabbix ${ZBX_VERSION}" _wget -q "$REPO_URL" -O /tmp/zbx_repo.deb
     run_step "Registando repositório Zabbix" dpkg --force-confmiss -i /tmp/zbx_repo.deb
     run_step "Sincronizando repositório Zabbix" apt-get update
     run_step "Verificando acesso ao repositório Zabbix ${ZBX_VERSION}" verify_zabbix_repo_active zabbix-server-pgsql
@@ -5742,7 +5742,7 @@ EOF
     fi
     run_step "Validando URL do repositório Zabbix ${ZBX_VERSION}" check_zabbix_repo_url
     [[ "$SIMULATE_MODE" != "1" ]] && validate_official_zabbix_package zabbix-proxy-sqlite3 "$ZBX_VERSION"
-    run_step "Baixando Repo Oficial Zabbix" wget -q "$REPO_URL" -O /tmp/zbx_repo.deb
+    run_step "Baixando Repo Oficial Zabbix" _wget -q "$REPO_URL" -O /tmp/zbx_repo.deb
     run_step "Validando Repositório" dpkg --force-confmiss -i /tmp/zbx_repo.deb
     run_step "Sincronizando novas sources" apt-get update
     run_step "Verificando acesso ao repositório Zabbix ${ZBX_VERSION}" verify_zabbix_repo_active zabbix-proxy-sqlite3
