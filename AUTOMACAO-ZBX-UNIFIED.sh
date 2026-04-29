@@ -569,7 +569,6 @@ export NEEDRESTART_MODE=a
 mkdir -p "$VALIDATION_CACHE_DIR" 2>/dev/null || true
 chmod 700 "$VALIDATION_CACHE_DIR" 2>/dev/null || true
 
-clear() { printf '\033c' 2>/dev/null || :; }
 INSTALL_WARNINGS=()
 ZBX_FRONTEND_LANG="en_US"
 
@@ -2155,12 +2154,6 @@ run_wipe_mode() {
     echo -e "\n${VERDE}${NEGRITO}Wipe concluído.${RESET}"
     echo -e "${NEGRITO}Log completo:${RESET} ${LOG_FILE}\n"
 }
-
-
-validate_supported_ubuntu_any_component() {
-    validate_supported_system_any_component
-}
-
 run_check_mode() {
     clear
     echo -e "${CIANO}${NEGRITO}╔══════════════════════════════════════════════════════════╗${RESET}"
