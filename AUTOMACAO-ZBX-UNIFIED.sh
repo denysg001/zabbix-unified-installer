@@ -2678,8 +2678,23 @@ doctor_db_connection_from_server_conf() {
 }
 
 doctor_scan_common_log_errors() {
-    local component="$1" files=() patterns file pattern count
-    patterns="database is down|connection refused|permission denied|version does not match current requirements|unsupported database|cannot connect to the database|PSK identity mismatch|psk mismatch|TLS handshake failed|TLS error|certificate verify failed|too many clients already|too many connections|database is not available"
+    local component="$1" files=() file pattern count
+    local -a patterns=(
+        "database is down"
+        "connection refused"
+        "permission denied"
+        "version does not match current requirements"
+        "unsupported database"
+        "cannot connect to the database"
+        "PSK identity mismatch"
+        "psk mismatch"
+        "TLS handshake failed"
+        "TLS error"
+        "certificate verify failed"
+        "too many clients already"
+        "too many connections"
+        "database is not available"
+    )
     case "$component" in
         db) files=(/var/log/postgresql/*.log) ;;
         server) files=(/var/log/zabbix/zabbix_server.log /var/log/nginx/error.log) ;;
@@ -2690,15 +2705,14 @@ doctor_scan_common_log_errors() {
     local found=0
     for file in "${files[@]}"; do
         [[ -f "$file" ]] || continue
-        while IFS= read -r pattern; do
-            [[ -n "$pattern" ]] || continue
+        for pattern in "${patterns[@]}"; do
             count=$(safe_count_matches "$pattern" "$file")
             if [[ "$count" =~ ^[0-9]+$ && "$count" -gt 0 ]]; then
                 found=1
                 DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
                 printf "  ${AMARELO}⚠${RESET} %-42s %s ocorrência(s) em %s\n" "$pattern" "$count" "$file"
             fi
-        done < <(echo "$patterns" | tr '|' '\n')
+        done
     done
     [[ "$found" == "0" ]] && echo -e "  ${VERDE}✔ Nenhum padrão crítico conhecido encontrado nos logs verificados.${RESET}"
     return 0
