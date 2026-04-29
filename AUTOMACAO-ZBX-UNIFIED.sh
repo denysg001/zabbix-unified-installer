@@ -784,6 +784,7 @@ run_step() {
         echo -e "\n${AMARELO}${NEGRITO}Diagnóstico sugerido:${RESET}"
         [[ -n "${LOG_FILE:-}" ]] && echo -e "  tail -n 120 ${LOG_FILE}"
         echo -e "  journalctl -xe --no-pager"
+        write_error_json "run_step" "$msg" "$*" || true
         exit 1
     fi
 }
