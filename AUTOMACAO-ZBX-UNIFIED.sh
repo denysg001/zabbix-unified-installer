@@ -181,12 +181,16 @@ EXIT_TRAP_COMMANDS=()
 run_exit_traps() {
     local _cmd
     for _cmd in "${EXIT_TRAP_COMMANDS[@]}"; do
-        eval "${_cmd}" >/dev/null 2>&1 || true
+        "${_cmd}" >/dev/null 2>&1 || true
     done
 }
 add_exit_trap() {
     EXIT_TRAP_COMMANDS+=("$1")
     trap run_exit_traps EXIT
+}
+
+cleanup_install_lock() {
+    [[ -n "${LOCK_FILE:-}" ]] && rm -f "$LOCK_FILE" 2>/dev/null || true
 }
 
 log_msg() {
@@ -227,7 +231,7 @@ acquire_install_lock() {
         rm -f "$LOCK_FILE" 2>/dev/null || true
     fi
     echo "$$" > "$LOCK_FILE"
-    add_exit_trap "rm -f '$LOCK_FILE'"
+    add_exit_trap cleanup_install_lock
 }
 
 check_tcp_listen() {
