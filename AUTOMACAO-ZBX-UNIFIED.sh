@@ -17,9 +17,31 @@ VALIDATION_CACHE_DIR="/tmp/zbx_validation_cache"
 ERROR_JSON="/root/zabbix_install_error.json"
 TSDB_TUNE_STATUS="não executado"
 
+mask_secret() {
+    local s="${1:-}"
+    [[ -z "$s" ]] && { echo ""; return; }
+    if (( ${#s} <= 8 )); then
+        echo "********"
+    else
+        echo "${s:0:4}********${s: -4}"
+    fi
+}
+
+redact_known_secrets() {
+    local text="${1:-}" name value masked
+    for name in DB_PASS PSK_AGENT_KEY PSK_PROXY_KEY PGPASSWORD; do
+        value="${!name-}"
+        [[ -n "$value" && ${#value} -ge 4 ]] || continue
+        masked="$(mask_secret "$value")"
+        text="${text//"$value"/"$masked"}"
+    done
+    printf '%s' "$text"
+}
+
 write_error_json() {
     local exit_code="${1:-1}" line_no="${2:-0}" cmd="${3:-comando desconhecido}" tmp_file
     local esc_cmd esc_component esc_log
+    cmd="$(redact_known_secrets "$cmd")"
     esc_cmd=${cmd//\\/\\\\}; esc_cmd=${esc_cmd//\"/\\\"}
     esc_component=${COMPONENT:-geral}; esc_component=${esc_component//\\/\\\\}; esc_component=${esc_component//\"/\\\"}
     esc_log=${LOG_FILE:-}; esc_log=${esc_log//\\/\\\\}; esc_log=${esc_log//\"/\\\"}
@@ -161,15 +183,17 @@ on_error() {
     local exit_code="$?"
     local line_no="${BASH_LINENO[0]:-${LINENO}}"
     local cmd="${BASH_COMMAND:-comando desconhecido}"
+    local safe_cmd
+    safe_cmd="$(redact_known_secrets "$cmd")"
     echo -e "\n\e[31m\e[1mERRO FATAL:\e[0m linha ${line_no}, código ${exit_code}." >&2
-    echo -e "\e[33mComando:\e[0m ${cmd}" >&2
+    echo -e "\e[33mComando:\e[0m ${safe_cmd}" >&2
     [[ -n "${LOG_FILE:-}" ]] && echo -e "\e[36mLog:\e[0m ${LOG_FILE}" >&2
     if [[ -n "${LOG_FILE:-}" ]]; then
         printf '[%s] [FATAL] linha %s, código %s — %s\n' \
-            "$(date '+%Y-%m-%d %H:%M:%S')" "$line_no" "$exit_code" "$cmd" \
+            "$(date '+%Y-%m-%d %H:%M:%S')" "$line_no" "$exit_code" "$safe_cmd" \
             >> "$LOG_FILE" 2>/dev/null || true
     fi
-    write_error_json "$exit_code" "$line_no" "$cmd"
+    write_error_json "$exit_code" "$line_no" "$safe_cmd"
     echo -e "\e[36mErro estruturado:\e[0m ${ERROR_JSON}" >&2
     print_file_guide error >&2
     exit "${exit_code}"
@@ -781,14 +805,16 @@ run_step() {
         CURRENT_STEP=$(( CURRENT_STEP + 1 )); draw_progress "✔ $msg"
         printf "\n"
     else
+        local safe_command
+        safe_command="$(redact_known_secrets "$*")"
         echo -e "\n${VERMELHO}${NEGRITO}✖ FALHA CRÍTICA PERSISTENTE${RESET}"
         echo -e "  ${NEGRITO}Etapa:${RESET} ${msg}"
-        echo -e "  ${NEGRITO}Comando/Função:${RESET} $*"
+        echo -e "  ${NEGRITO}Comando/Função:${RESET} ${safe_command}"
         [[ -n "${LOG_FILE:-}" ]] && echo -e "  ${NEGRITO}Log:${RESET} ${LOG_FILE}"
         echo -e "\n${AMARELO}${NEGRITO}Diagnóstico sugerido:${RESET}"
         [[ -n "${LOG_FILE:-}" ]] && echo -e "  tail -n 120 ${LOG_FILE}"
         echo -e "  journalctl -xe --no-pager"
-        write_error_json "run_step" "$msg" "$*" || true
+        write_error_json "run_step" "$msg" "$safe_command" || true
         exit 1
     fi
 }
@@ -857,16 +883,6 @@ abort_rhel_not_ready() {
         echo -e "  O instalador reconhece AlmaLinux/Rocky para preparação futura, mas aborta antes de qualquer instalação parcial."
         echo -e "  Use Ubuntu/Debian suportado nesta versão."
         exit 1
-    fi
-}
-
-mask_secret() {
-    local s="${1:-}"
-    [[ -z "$s" ]] && { echo ""; return; }
-    if (( ${#s} <= 8 )); then
-        echo "********"
-    else
-        echo "${s:0:4}********${s: -4}"
     fi
 }
 
@@ -3121,7 +3137,7 @@ EOF
         echo -e "\n${AMARELO}Senha do Utilizador${RESET}"
         echo -e "   A senha é sempre gerada automaticamente (32 caracteres hex)."
         DB_PASS=$(openssl rand -hex 16)
-        echo -e "   ${VERDE}Senha gerada: ${NEGRITO}${DB_PASS}${RESET}"
+        echo -e "   ${VERDE}Senha gerada: ${NEGRITO}$(mask_secret "$DB_PASS")${RESET}"
         local redef
         ask_yes_no "Redefinir a senha manualmente?" redef
         if [[ "$redef" == "1" ]]; then
