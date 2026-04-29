@@ -457,6 +457,10 @@ while [[ $# -gt 0 ]]; do
         --debug-services) DEBUG_SERVICES=1; shift ;;
         --collect-support-bundle) COLLECT_SUPPORT_BUNDLE=1; shift ;;
         --self-test) SELF_TEST_MODE=1; shift ;;
+        --version|-V)
+            printf '%s\n' "$INSTALLER_VERSION"
+            exit 0
+            ;;
         --simulate|-s) SIMULATE_MODE=1; shift ;;
         --wipe) WIPE_MODE=1; shift ;;
         --wipe-db) WIPE_MODE=1; WIPE_DB=1; shift ;;
@@ -505,6 +509,7 @@ Opções:
   --debug-services Diagnostica serviços/portas/processos sem instalar nada.
   --collect-support-bundle Coleta diagnóstico em um .tar.gz para suporte.
   --self-test   Valida o próprio instalador sem instalar nada.
+  --version, -V Mostra a versão do instalador e sai.
   --mode <modo> Executa direto: db, server ou proxy.
   --wipe        Limpeza completa de Zabbix/Nginx, com confirmação.
   --wipe-db     Limpeza completa incluindo PostgreSQL/TimescaleDB e dados da BD.
@@ -527,6 +532,7 @@ Exemplos:
   $0 --debug-services Diagnostica serviços sem instalar
   $0 --collect-support-bundle Gera pacote único para análise de problemas
   $0 --self-test Valida funções internas e dependências básicas
+  $0 --version  Mostra a versão do instalador
   $0 --wipe     Remove instalações anteriores no escopo Zabbix/Nginx
   $0 --wipe-db  Remove também PostgreSQL/TimescaleDB e dados da BD
 
