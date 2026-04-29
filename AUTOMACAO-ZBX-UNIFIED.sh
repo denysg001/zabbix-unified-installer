@@ -19,8 +19,11 @@ TSDB_TUNE_STATUS="não executado"
 
 mask_secret() {
     local s="${1:-}"
-    [[ -z "$s" ]] && { echo ""; return; }
-    if (( ${#s} <= 8 )); then
+    [[ -z "$s" ]] && {
+        echo ""
+        return
+    }
+    if ((${#s} <= 8)); then
         echo "********"
     else
         echo "${s:0:4}********${s: -4}"
@@ -42,9 +45,14 @@ write_error_json() {
     local exit_code="${1:-1}" line_no="${2:-0}" cmd="${3:-comando desconhecido}" tmp_file
     local esc_cmd esc_component esc_log
     cmd="$(redact_known_secrets "$cmd")"
-    esc_cmd=${cmd//\\/\\\\}; esc_cmd=${esc_cmd//\"/\\\"}
-    esc_component=${COMPONENT:-geral}; esc_component=${esc_component//\\/\\\\}; esc_component=${esc_component//\"/\\\"}
-    esc_log=${LOG_FILE:-}; esc_log=${esc_log//\\/\\\\}; esc_log=${esc_log//\"/\\\"}
+    esc_cmd=${cmd//\\/\\\\}
+    esc_cmd=${esc_cmd//\"/\\\"}
+    esc_component=${COMPONENT:-geral}
+    esc_component=${esc_component//\\/\\\\}
+    esc_component=${esc_component//\"/\\\"}
+    esc_log=${LOG_FILE:-}
+    esc_log=${esc_log//\\/\\\\}
+    esc_log=${esc_log//\"/\\\"}
     tmp_file="$(mktemp /tmp/zabbix_install_error.XXXXXX 2>/dev/null || echo /tmp/zabbix_install_error.$$)"
     {
         echo "{"
@@ -57,7 +65,7 @@ write_error_json() {
         printf '  "log_file": "%s",\n' "$esc_log"
         printf '  "hint": "%s"\n' "Leia o log indicado e rode o modo --doctor; comandos de diagnóstico usam timeout para não travar."
         echo "}"
-    } > "$tmp_file" 2>/dev/null || true
+    } >"$tmp_file" 2>/dev/null || true
     install -m 600 "$tmp_file" "$ERROR_JSON" 2>/dev/null || cp "$tmp_file" "$ERROR_JSON" 2>/dev/null || true
     rm -f "$tmp_file" 2>/dev/null || true
 }
@@ -112,23 +120,23 @@ print_file_guide() {
     local context="${1:-geral}"
     echo -e "\n${CIANO}${NEGRITO}▸ ONDE CONFERIR DEPOIS${RESET}"
     case "$context" in
-        error)
-            printf "  %-34s %s\n" "Se deu erro fatal:" "$ERROR_JSON"
-            printf "  %-34s %s\n" "Log detalhado:" "${LOG_FILE:-não definido nesta etapa}"
-            printf "  %-34s %s\n" "O que enviar ao suporte:" "primeiro o JSON; se pedir, envie também o log detalhado"
-            ;;
-        install)
-            printf "  %-34s %s\n" "Resumo completo colorido:" "/root/zabbix_install_summary.txt"
-            printf "  %-34s %s\n" "Resumo limpo para copiar/cat:" "/root/zabbix_install_summary_plain.txt"
-            printf "  %-34s %s\n" "Resumo estruturado JSON:" "/root/zabbix_install_summary.json"
-            printf "  %-34s %s\n" "Se algo falhar depois:" "$ERROR_JSON"
-            printf "  %-34s %s\n" "Log detalhado:" "${LOG_FILE:-não definido nesta etapa}"
-            ;;
-        doctor)
-            printf "  %-34s %s\n" "Relatório do Doctor:" "/root/zabbix_doctor_report.txt"
-            printf "  %-34s %s\n" "Se o Doctor apontar problema:" "envie este relatório primeiro"
-            printf "  %-34s %s\n" "Se houve erro fatal:" "$ERROR_JSON"
-            ;;
+    error)
+        printf "  %-34s %s\n" "Se deu erro fatal:" "$ERROR_JSON"
+        printf "  %-34s %s\n" "Log detalhado:" "${LOG_FILE:-não definido nesta etapa}"
+        printf "  %-34s %s\n" "O que enviar ao suporte:" "primeiro o JSON; se pedir, envie também o log detalhado"
+        ;;
+    install)
+        printf "  %-34s %s\n" "Resumo completo colorido:" "/root/zabbix_install_summary.txt"
+        printf "  %-34s %s\n" "Resumo limpo para copiar/cat:" "/root/zabbix_install_summary_plain.txt"
+        printf "  %-34s %s\n" "Resumo estruturado JSON:" "/root/zabbix_install_summary.json"
+        printf "  %-34s %s\n" "Se algo falhar depois:" "$ERROR_JSON"
+        printf "  %-34s %s\n" "Log detalhado:" "${LOG_FILE:-não definido nesta etapa}"
+        ;;
+    doctor)
+        printf "  %-34s %s\n" "Relatório do Doctor:" "/root/zabbix_doctor_report.txt"
+        printf "  %-34s %s\n" "Se o Doctor apontar problema:" "envie este relatório primeiro"
+        printf "  %-34s %s\n" "Se houve erro fatal:" "$ERROR_JSON"
+        ;;
     esac
 }
 
@@ -147,7 +155,7 @@ sanitize_plain_text() {
         gsub(/\r/, "")
         gsub(/[\001-\010\013\014\016-\037\177]/, "")
         print
-    }' > "$tmp" 2>/dev/null || true
+    }' >"$tmp" 2>/dev/null || true
     if command -v iconv >/dev/null 2>&1; then
         iconv -f UTF-8 -t UTF-8 -c "$tmp" 2>/dev/null || cat "$tmp" 2>/dev/null || true
     else
@@ -175,7 +183,10 @@ _wget() {
 psql() {
     local psql_bin
     psql_bin="$(type -P psql 2>/dev/null || true)"
-    [[ -n "$psql_bin" ]] || { echo "psql não encontrado" >&2; return 127; }
+    [[ -n "$psql_bin" ]] || {
+        echo "psql não encontrado" >&2
+        return 127
+    }
     PGCONNECT_TIMEOUT="${PGCONNECT_TIMEOUT:-10}" timeout "${PSQL_TIMEOUT:-900}" "$psql_bin" "$@"
 }
 
@@ -191,7 +202,7 @@ on_error() {
     if [[ -n "${LOG_FILE:-}" ]]; then
         printf '[%s] [FATAL] linha %s, código %s — %s\n' \
             "$(date '+%Y-%m-%d %H:%M:%S')" "$line_no" "$exit_code" "$safe_cmd" \
-            >> "$LOG_FILE" 2>/dev/null || true
+            >>"$LOG_FILE" 2>/dev/null || true
     fi
     write_error_json "$exit_code" "$line_no" "$safe_cmd"
     echo -e "\e[36mErro estruturado:\e[0m ${ERROR_JSON}" >&2
@@ -218,10 +229,11 @@ cleanup_install_lock() {
 }
 
 log_msg() {
-    local level="$1"; shift
+    local level="$1"
+    shift
     local message="$*"
-    [[ -n "${LOG_FILE:-}" ]] && printf '[%s] [%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$level" "$message" >> "$LOG_FILE" 2>/dev/null || true
-    [[ -n "${FULL_LOG:-}" ]] && printf '[%s] [%s] [%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$level" "${COMPONENT:-geral}" "$message" >> "$FULL_LOG" 2>/dev/null || true
+    [[ -n "${LOG_FILE:-}" ]] && printf '[%s] [%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$level" "$message" >>"$LOG_FILE" 2>/dev/null || true
+    [[ -n "${FULL_LOG:-}" ]] && printf '[%s] [%s] [%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$level" "${COMPONENT:-geral}" "$message" >>"$FULL_LOG" 2>/dev/null || true
 }
 
 init_install_log() {
@@ -231,7 +243,7 @@ init_install_log() {
     COMPONENT_LOG="${LOG_DIR}/${component}.log"
     mkdir -p "$LOG_DIR" 2>/dev/null || true
     chmod 700 "$LOG_DIR" 2>/dev/null || true
-    : > "$COMPONENT_LOG" 2>/dev/null || true
+    : >"$COMPONENT_LOG" 2>/dev/null || true
     touch "$FULL_LOG" 2>/dev/null || true
     chmod 600 "$COMPONENT_LOG" "$FULL_LOG" 2>/dev/null || true
     LOG_FILE="$legacy_path"
@@ -254,7 +266,7 @@ acquire_install_lock() {
         fi
         rm -f "$LOCK_FILE" 2>/dev/null || true
     fi
-    echo "$$" > "$LOCK_FILE"
+    echo "$$" >"$LOCK_FILE"
     add_exit_trap cleanup_install_lock
 }
 
@@ -267,12 +279,12 @@ check_tcp_listen() {
         else
             echo -e "  ${AMARELO}⚠${RESET} ${label}: porta ${port}/TCP não apareceu em escuta"
             log_msg "WARN" "${label}: porta ${port}/TCP não apareceu em escuta"
-            [[ "${DOCTOR_ACTIVE:-0}" == "1" ]] && DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
+            [[ "${DOCTOR_ACTIVE:-0}" == "1" ]] && DOCTOR_WARN=$((DOCTOR_WARN + 1))
         fi
     else
         echo -e "  ${AMARELO}⚠${RESET} ss não disponível para validar porta ${port}/TCP (${label})"
         log_msg "WARN" "ss não disponível para validar porta ${port}/TCP (${label})"
-        [[ "${DOCTOR_ACTIVE:-0}" == "1" ]] && DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
+        [[ "${DOCTOR_ACTIVE:-0}" == "1" ]] && DOCTOR_WARN=$((DOCTOR_WARN + 1))
     fi
 }
 
@@ -292,7 +304,7 @@ check_frontend_http() {
             else
                 echo -e "  ${AMARELO}⚠${RESET} Frontend respondeu HTTP ${http_code}, mas não foi possível confirmar conteúdo Zabbix"
                 log_msg "WARN" "Frontend respondeu em ${url}, mas conteúdo Zabbix não foi confirmado"
-                [[ "${DOCTOR_ACTIVE:-0}" == "1" ]] && DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
+                [[ "${DOCTOR_ACTIVE:-0}" == "1" ]] && DOCTOR_WARN=$((DOCTOR_WARN + 1))
             fi
             rm -f "$tmp_body"
             return 0
@@ -302,7 +314,7 @@ check_frontend_http() {
     rm -f "$tmp_body"
     echo -e "  ${AMARELO}⚠${RESET} Frontend Zabbix: sem resposta HTTP local em ${url} (3 tentativas)"
     log_msg "WARN" "Frontend sem resposta HTTP local em ${url}"
-    [[ "${DOCTOR_ACTIVE:-0}" == "1" ]] && DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
+    [[ "${DOCTOR_ACTIVE:-0}" == "1" ]] && DOCTOR_WARN=$((DOCTOR_WARN + 1))
 }
 
 print_service_journal_tail() {
@@ -321,21 +333,21 @@ validate_service_active() {
         echo -e "  ${AMARELO}⚠${RESET} ${service}: não está ativo — diagnóstico: journalctl -u ${service} -n 30 --no-pager"
         log_msg "WARN" "Serviço ${service} não está ativo"
         print_service_journal_tail "$service" 20
-        [[ "${DOCTOR_ACTIVE:-0}" == "1" ]] && DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
+        [[ "${DOCTOR_ACTIVE:-0}" == "1" ]] && DOCTOR_WARN=$((DOCTOR_WARN + 1))
     fi
 }
 
 wait_for_service_active() {
     local service="$1" timeout_s="${2:-30}" waited=0
     log_msg "INFO" "Aguardando serviço ${service} ficar ativo por até ${timeout_s}s"
-    while (( waited < timeout_s )); do
+    while ((waited < timeout_s)); do
         if systemctl is-active --quiet "$service" 2>/dev/null; then
             echo -e "  ${VERDE}✔${RESET} ${service}: ativo após ${waited}s"
             log_msg "OK" "Serviço ${service} ativo após ${waited}s"
             return 0
         fi
         sleep 2
-        waited=$(( waited + 2 ))
+        waited=$((waited + 2))
     done
     echo -e "\n${VERMELHO}${NEGRITO}ERRO:${RESET} ${service} não ficou ativo em ${timeout_s}s."
     echo -e "  Diagnóstico sugerido: journalctl -u ${service} -n 80 --no-pager"
@@ -380,49 +392,53 @@ post_validate_installation() {
     echo -e "\n${CIANO}${NEGRITO}▸ PÓS-VALIDAÇÃO AUTOMÁTICA${RESET}"
     log_msg "INFO" "Iniciando pós-validação do componente ${component}"
     case "$component" in
-        db)
-            if postgres_is_ready "${PG_VER:-}" "${PG_CLUSTER_NAME:-main}"; then
-                echo -e "  ${VERDE}✔${RESET} PostgreSQL: pronto"
-                log_msg "OK" "PostgreSQL pronto"
-            else
-                echo -e "  ${VERMELHO}${NEGRITO}✖${RESET} PostgreSQL: não está pronto"
-                log_msg "WARN" "PostgreSQL não está pronto"
-                print_service_journal_tail "postgresql@${PG_VER:-17}-${PG_CLUSTER_NAME:-main}" 20
-                print_service_journal_tail postgresql 20
-                _CRITICAL_SERVICES_OK=0
-            fi
-            check_tcp_listen 5432 "PostgreSQL"
-            [[ "${INSTALL_AGENT:-0}" == "1" ]] && _validate_critical zabbix-agent2
-            ;;
-        server)
-            _validate_critical zabbix-server
-            _validate_critical nginx
-            if [[ -n "${PHP_VER:-}" ]]; then
-                _validate_critical "php${PHP_VER}-fpm"
-            else
-                echo -e "  ${AMARELO}⚠${RESET} PHP_VER não definido — validação do php-fpm ignorada"
-                log_msg "WARN" "PHP_VER não definido; validação php-fpm ignorada"
-            fi
-            [[ "${INSTALL_AGENT:-0}" == "1" ]] && _validate_critical zabbix-agent2
-            check_tcp_listen 10051 "Zabbix Server"
-            check_tcp_listen "${NGINX_PORT:-80}" "Frontend Nginx"
-            check_frontend_http
-            doctor_db_connection_from_server_conf
-            ;;
-        proxy)
-            _validate_critical zabbix-proxy
-            [[ "${INSTALL_AGENT:-0}" == "1" ]] && _validate_critical zabbix-agent2
-            check_tcp_listen 10051 "Zabbix Proxy"
-            check_proxy_server_connectivity "${ZBX_SERVER:-}" "${PROXY_MODE:-0}"
-            ;;
+    db)
+        if postgres_is_ready "${PG_VER:-}" "${PG_CLUSTER_NAME:-main}"; then
+            echo -e "  ${VERDE}✔${RESET} PostgreSQL: pronto"
+            log_msg "OK" "PostgreSQL pronto"
+        else
+            echo -e "  ${VERMELHO}${NEGRITO}✖${RESET} PostgreSQL: não está pronto"
+            log_msg "WARN" "PostgreSQL não está pronto"
+            print_service_journal_tail "postgresql@${PG_VER:-17}-${PG_CLUSTER_NAME:-main}" 20
+            print_service_journal_tail postgresql 20
+            _CRITICAL_SERVICES_OK=0
+        fi
+        check_tcp_listen 5432 "PostgreSQL"
+        [[ "${INSTALL_AGENT:-0}" == "1" ]] && _validate_critical zabbix-agent2
+        ;;
+    server)
+        _validate_critical zabbix-server
+        _validate_critical nginx
+        if [[ -n "${PHP_VER:-}" ]]; then
+            _validate_critical "php${PHP_VER}-fpm"
+        else
+            echo -e "  ${AMARELO}⚠${RESET} PHP_VER não definido — validação do php-fpm ignorada"
+            log_msg "WARN" "PHP_VER não definido; validação php-fpm ignorada"
+        fi
+        [[ "${INSTALL_AGENT:-0}" == "1" ]] && _validate_critical zabbix-agent2
+        check_tcp_listen 10051 "Zabbix Server"
+        check_tcp_listen "${NGINX_PORT:-80}" "Frontend Nginx"
+        check_frontend_http
+        doctor_db_connection_from_server_conf
+        ;;
+    proxy)
+        _validate_critical zabbix-proxy
+        [[ "${INSTALL_AGENT:-0}" == "1" ]] && _validate_critical zabbix-agent2
+        check_tcp_listen 10051 "Zabbix Proxy"
+        check_proxy_server_connectivity "${ZBX_SERVER:-}" "${PROXY_MODE:-0}"
+        ;;
     esac
 }
 
 # ------------------------------------------------------------------------------
 # 1. ESTÉTICA E CORES
 # ------------------------------------------------------------------------------
-VERDE="\e[32m"; AMARELO="\e[33m"; VERMELHO="\e[31m"
-CIANO="\e[36m"; NEGRITO="\e[1m"; RESET="\e[0m"
+VERDE="\e[32m"
+AMARELO="\e[33m"
+VERMELHO="\e[31m"
+CIANO="\e[36m"
+NEGRITO="\e[1m"
+RESET="\e[0m"
 INSTALLER_VERSION="v5.5"
 INSTALLER_LABEL="AUTOMACAO-ZBX-UNIFIED ${INSTALLER_VERSION}"
 
@@ -445,50 +461,103 @@ SELF_TEST_MODE=0
 REQUESTED_COMPONENT=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --check|-c) CHECK_ONLY=1; shift ;;
-        --dry-run|-n) DRY_RUN=1; shift ;;
-        --doctor|-d) DOCTOR_MODE=1; shift ;;
-        --doctor-export) DOCTOR_MODE=1; DOCTOR_EXPORT=1; shift ;;
-        --export) DOCTOR_EXPORT=1; shift ;;
-        --list-versions) LIST_VERSIONS=1; shift ;;
-        --list-supported-os) LIST_SUPPORTED_OS=1; shift ;;
-        --repo-check) REPO_CHECK=1; shift ;;
-        --safe) SAFE_MODE=1; shift ;;
-        --debug-services) DEBUG_SERVICES=1; shift ;;
-        --collect-support-bundle) COLLECT_SUPPORT_BUNDLE=1; shift ;;
-        --self-test) SELF_TEST_MODE=1; shift ;;
-        --version|-V)
-            printf '%s\n' "$INSTALLER_VERSION"
-            exit 0
+    --check | -c)
+        CHECK_ONLY=1
+        shift
+        ;;
+    --dry-run | -n)
+        DRY_RUN=1
+        shift
+        ;;
+    --doctor | -d)
+        DOCTOR_MODE=1
+        shift
+        ;;
+    --doctor-export)
+        DOCTOR_MODE=1
+        DOCTOR_EXPORT=1
+        shift
+        ;;
+    --export)
+        DOCTOR_EXPORT=1
+        shift
+        ;;
+    --list-versions)
+        LIST_VERSIONS=1
+        shift
+        ;;
+    --list-supported-os)
+        LIST_SUPPORTED_OS=1
+        shift
+        ;;
+    --repo-check)
+        REPO_CHECK=1
+        shift
+        ;;
+    --safe)
+        SAFE_MODE=1
+        shift
+        ;;
+    --debug-services)
+        DEBUG_SERVICES=1
+        shift
+        ;;
+    --collect-support-bundle)
+        COLLECT_SUPPORT_BUNDLE=1
+        shift
+        ;;
+    --self-test)
+        SELF_TEST_MODE=1
+        shift
+        ;;
+    --version | -V)
+        printf '%s\n' "$INSTALLER_VERSION"
+        exit 0
+        ;;
+    --simulate | -s)
+        SIMULATE_MODE=1
+        shift
+        ;;
+    --wipe)
+        WIPE_MODE=1
+        shift
+        ;;
+    --wipe-db)
+        WIPE_MODE=1
+        WIPE_DB=1
+        shift
+        ;;
+    --mode)
+        if [[ -z "${2:-}" ]]; then
+            echo -e "${VERMELHO}${NEGRITO}ERRO:${RESET} --mode requer um valor: db, server ou proxy."
+            exit 1
+        fi
+        case "$2" in
+        db | database | bd) REQUESTED_COMPONENT="db" ;;
+        server | servidor) REQUESTED_COMPONENT="server" ;;
+        proxy) REQUESTED_COMPONENT="proxy" ;;
+        *)
+            echo -e "${VERMELHO}${NEGRITO}ERRO:${RESET} modo inválido em --mode: $2"
+            echo "Use: --mode db, --mode server ou --mode proxy."
+            exit 1
             ;;
-        --simulate|-s) SIMULATE_MODE=1; shift ;;
-        --wipe) WIPE_MODE=1; shift ;;
-        --wipe-db) WIPE_MODE=1; WIPE_DB=1; shift ;;
-        --mode)
-            if [[ -z "${2:-}" ]]; then
-                echo -e "${VERMELHO}${NEGRITO}ERRO:${RESET} --mode requer um valor: db, server ou proxy."
-                exit 1
-            fi
-            case "$2" in
-                db|database|bd) REQUESTED_COMPONENT="db" ;;
-                server|servidor) REQUESTED_COMPONENT="server" ;;
-                proxy) REQUESTED_COMPONENT="proxy" ;;
-                *)
-                    echo -e "${VERMELHO}${NEGRITO}ERRO:${RESET} modo inválido em --mode: $2"
-                    echo "Use: --mode db, --mode server ou --mode proxy."
-                    exit 1
-                    ;;
-            esac
-            shift 2
-            ;;
-        db|database|bd)
-            REQUESTED_COMPONENT="db"; shift ;;
-        server|servidor)
-            REQUESTED_COMPONENT="server"; shift ;;
-        proxy)
-            REQUESTED_COMPONENT="proxy"; shift ;;
-        --help|-h)
-            cat << EOF
+        esac
+        shift 2
+        ;;
+    db | database | bd)
+        REQUESTED_COMPONENT="db"
+        shift
+        ;;
+    server | servidor)
+        REQUESTED_COMPONENT="server"
+        shift
+        ;;
+    proxy)
+        REQUESTED_COMPONENT="proxy"
+        shift
+        ;;
+    --help | -h)
+        cat <<EOF
 Uso: $0 [componente] [opções]
 
 Componentes opcionais:
@@ -538,13 +607,13 @@ Exemplos:
 
 Atenção: em modo normal, este instalador é destrutivo por design e remove vestígios de instalações anteriores do componente escolhido.
 EOF
-            exit 0
-            ;;
-        *)
-            echo -e "${VERMELHO}${NEGRITO}ERRO:${RESET} Opção desconhecida: $1"
-            echo "Use --help para ver as opções disponíveis."
-            exit 1
-            ;;
+        exit 0
+        ;;
+    *)
+        echo -e "${VERMELHO}${NEGRITO}ERRO:${RESET} Opção desconhecida: $1"
+        echo "Use --help para ver as opções disponíveis."
+        exit 1
+        ;;
     esac
 done
 
@@ -563,22 +632,22 @@ U_CODENAME=$(lsb_release -cs 2>/dev/null || { [[ -r /etc/os-release ]] && awk -F
 OS_ID=$(awk -F= '$1=="ID"{gsub(/"/,"",$2); print $2}' /etc/os-release 2>/dev/null || true)
 OS_PRETTY=$(awk -F= '$1=="PRETTY_NAME"{gsub(/"/,"",$2); print $2}' /etc/os-release 2>/dev/null || true)
 case "$OS_ID" in
-    ubuntu)
-        OS_FAMILY="ubuntu"
-        OS_LABEL="Ubuntu"
-        ;;
-    debian)
-        OS_FAMILY="debian"
-        OS_LABEL="Debian"
-        ;;
-    almalinux|rocky|rocky-linux|rhel|centos)
-        OS_FAMILY="rhel"
-        OS_LABEL="${OS_ID^}"
-        ;;
-    *)
-        OS_FAMILY="unsupported"
-        OS_LABEL="${OS_ID:-sistema desconhecido}"
-        ;;
+ubuntu)
+    OS_FAMILY="ubuntu"
+    OS_LABEL="Ubuntu"
+    ;;
+debian)
+    OS_FAMILY="debian"
+    OS_LABEL="Debian"
+    ;;
+almalinux | rocky | rocky-linux | rhel | centos)
+    OS_FAMILY="rhel"
+    OS_LABEL="${OS_ID^}"
+    ;;
+*)
+    OS_FAMILY="unsupported"
+    OS_LABEL="${OS_ID:-sistema desconhecido}"
+    ;;
 esac
 OS_DISPLAY="${OS_PRETTY:-${OS_LABEL} ${U_VER} (${U_CODENAME})}"
 RAM_MB=""
@@ -586,7 +655,7 @@ if command -v free >/dev/null 2>&1; then
     RAM_MB=$(free -m 2>/dev/null | awk '/^Mem/{print $2}' || true)
 fi
 if [[ -z "${RAM_MB:-}" ]] && command -v sysctl >/dev/null 2>&1; then
-    RAM_MB=$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1024 / 1024 ))
+    RAM_MB=$(($(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1024 / 1024))
 fi
 CPU_CORES=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
 
@@ -614,30 +683,30 @@ auto_repair_apt() {
     local waited=0
 
     apt_process_running() {
-        pgrep -x "apt" >/dev/null 2>&1 || \
-        pgrep -x "apt-get" >/dev/null 2>&1 || \
-        pgrep -x "dpkg" >/dev/null 2>&1 || \
-        pgrep -x "unattended-upgrades" >/dev/null 2>&1
+        pgrep -x "apt" >/dev/null 2>&1 ||
+            pgrep -x "apt-get" >/dev/null 2>&1 ||
+            pgrep -x "dpkg" >/dev/null 2>&1 ||
+            pgrep -x "unattended-upgrades" >/dev/null 2>&1
     }
 
     while apt_process_running; do
-        if (( waited >= timeout )); then
-            [[ -n "${LOG_FILE:-}" ]] && echo "APT ocupado ha ${timeout}s; tentando liberar apt-daily..." >> "$LOG_FILE" 2>/dev/null || true
+        if ((waited >= timeout)); then
+            [[ -n "${LOG_FILE:-}" ]] && echo "APT ocupado ha ${timeout}s; tentando liberar apt-daily..." >>"$LOG_FILE" 2>/dev/null || true
             systemctl stop apt-daily.service apt-daily-upgrade.service 2>/dev/null || true
             systemctl kill --kill-who=all apt-daily.service apt-daily-upgrade.service 2>/dev/null || true
             break
         fi
         sleep 2
-        waited=$(( waited + 2 ))
+        waited=$((waited + 2))
     done
 
     if ! apt_process_running; then
         rm -f /var/lib/dpkg/lock-frontend \
-              /var/lib/dpkg/lock \
-              /var/lib/apt/lists/lock \
-              /var/cache/apt/archives/lock 2>/dev/null || true
+            /var/lib/dpkg/lock \
+            /var/lib/apt/lists/lock \
+            /var/cache/apt/archives/lock 2>/dev/null || true
     else
-        [[ -n "${LOG_FILE:-}" ]] && echo "APT/dpkg ainda em execucao; locks preservados." >> "$LOG_FILE" 2>/dev/null || true
+        [[ -n "${LOG_FILE:-}" ]] && echo "APT/dpkg ainda em execucao; locks preservados." >>"$LOG_FILE" 2>/dev/null || true
     fi
 
     dpkg --configure -a 2>/dev/null | { [[ -n "${LOG_FILE:-}" ]] && tee -a "$LOG_FILE" || cat; } 2>/dev/null || true
@@ -668,32 +737,41 @@ select_timezone_value() {
     while true; do
         read -rp "  Escolha (1, 2, 3 ou 4): " opt
         case "$opt" in
-            1) printf '%s\n' "America/Sao_Paulo"; return 0 ;;
-            2) printf '%s\n' "UTC"; return 0 ;;
-            3|"") printf '%s\n' "$current"; return 0 ;;
-            4)
-                while true; do
-                    read -rp "   Novo fuso (ex: America/Sao_Paulo, Europe/Lisbon, UTC): " custom_tz
-                    if validate_timezone_name "$custom_tz"; then
-                        printf '%s\n' "$custom_tz"
-                        return 0
-                    fi
-                    echo -e "   ${VERMELHO}Fuso inválido ou não encontrado neste sistema.${RESET}" >&2
-                done
-                ;;
-            *) echo -e "  ${VERMELHO}Opção inválida.${RESET}" >&2 ;;
+        1)
+            printf '%s\n' "America/Sao_Paulo"
+            return 0
+            ;;
+        2)
+            printf '%s\n' "UTC"
+            return 0
+            ;;
+        3 | "")
+            printf '%s\n' "$current"
+            return 0
+            ;;
+        4)
+            while true; do
+                read -rp "   Novo fuso (ex: America/Sao_Paulo, Europe/Lisbon, UTC): " custom_tz
+                if validate_timezone_name "$custom_tz"; then
+                    printf '%s\n' "$custom_tz"
+                    return 0
+                fi
+                echo -e "   ${VERMELHO}Fuso inválido ou não encontrado neste sistema.${RESET}" >&2
+            done
+            ;;
+        *) echo -e "  ${VERMELHO}Opção inválida.${RESET}" >&2 ;;
         esac
     done
 }
 
 ensure_utf8_locales() {
     if [[ -f /etc/locale.gen ]]; then
-        grep -qE '^[# ]*en_US\.UTF-8 UTF-8' /etc/locale.gen 2>/dev/null && \
+        grep -qE '^[# ]*en_US\.UTF-8 UTF-8' /etc/locale.gen 2>/dev/null &&
             sed -i 's/^[# ]*en_US\.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
-        grep -qE '^[# ]*pt_BR\.UTF-8 UTF-8' /etc/locale.gen 2>/dev/null && \
+        grep -qE '^[# ]*pt_BR\.UTF-8 UTF-8' /etc/locale.gen 2>/dev/null &&
             sed -i 's/^[# ]*pt_BR\.UTF-8 UTF-8/pt_BR.UTF-8 UTF-8/' /etc/locale.gen
-        grep -qE '^en_US\.UTF-8 UTF-8' /etc/locale.gen 2>/dev/null || echo 'en_US.UTF-8 UTF-8' >> /etc/locale.gen
-        grep -qE '^pt_BR\.UTF-8 UTF-8' /etc/locale.gen 2>/dev/null || echo 'pt_BR.UTF-8 UTF-8' >> /etc/locale.gen
+        grep -qE '^en_US\.UTF-8 UTF-8' /etc/locale.gen 2>/dev/null || echo 'en_US.UTF-8 UTF-8' >>/etc/locale.gen
+        grep -qE '^pt_BR\.UTF-8 UTF-8' /etc/locale.gen 2>/dev/null || echo 'pt_BR.UTF-8 UTF-8' >>/etc/locale.gen
     fi
     locale-gen en_US.UTF-8 pt_BR.UTF-8 2>/dev/null || locale-gen 2>/dev/null || true
     if locale -a 2>/dev/null | grep -qiE '^en_US\.(utf8|UTF-8)$'; then
@@ -745,7 +823,7 @@ set_config() {
             echo "Arquivo de configuração não encontrado e não foi possível criar: ${file}" >&2
             return 1
         }
-        [[ -n "$value" ]] && echo "${param}=${value}" >> "$file"
+        [[ -n "$value" ]] && echo "${param}=${value}" >>"$file"
         return
     fi
     if [[ -z "$value" ]]; then
@@ -767,29 +845,32 @@ set_config() {
     elif grep -qE "^#[[:space:]]*${param}=" "$file"; then
         sed -i "0,/^#[[:space:]]*${param}=/{s|^#[[:space:]]*${param}=.*|${param}=${escaped_value}|}" "$file"
     else
-        echo "${param}=${value}" >> "$file"
+        echo "${param}=${value}" >>"$file"
     fi
 }
 
-CURRENT_STEP=0; TOTAL_STEPS=1
+CURRENT_STEP=0
+TOTAL_STEPS=1
 
 draw_progress() {
     local msg="${1:-}" pct filled empty bar="" i
     [[ $TOTAL_STEPS -le 0 ]] && TOTAL_STEPS=1
-    pct=$(( CURRENT_STEP * 100 / TOTAL_STEPS ))
-    (( pct > 100 )) && pct=100
-    filled=$(( pct / 2 )); empty=$(( 50 - filled ))
-    (( filled > 50 )) && filled=50
-    (( empty < 0 )) && empty=0
-    for ((i=0; i<filled; i++)); do bar+="█"; done
-    for ((i=0; i<empty;  i++)); do bar+="░"; done
+    pct=$((CURRENT_STEP * 100 / TOTAL_STEPS))
+    ((pct > 100)) && pct=100
+    filled=$((pct / 2))
+    empty=$((50 - filled))
+    ((filled > 50)) && filled=50
+    ((empty < 0)) && empty=0
+    for ((i = 0; i < filled; i++)); do bar+="█"; done
+    for ((i = 0; i < empty; i++)); do bar+="░"; done
     printf "\r  ${VERDE}[%s]${RESET} ${NEGRITO}%3d%%${RESET}  %-45s" "$bar" "$pct" "$msg"
 }
 
 run_step() {
-    local msg="$1"; shift
+    local msg="$1"
+    shift
     if [[ "${SIMULATE_MODE:-0}" == "1" ]]; then
-        CURRENT_STEP=$(( CURRENT_STEP + 1 ))
+        CURRENT_STEP=$((CURRENT_STEP + 1))
         draw_progress "[SIMULAÇÃO] $msg"
         printf "\n  [SIMULAÇÃO] Executaria etapa: %s\n" "$msg"
         return 0
@@ -808,11 +889,20 @@ run_step() {
     fi
     while [ $count -lt $max_retries ]; do
         draw_progress "$msg"
-        if "$@" >>"$LOG_FILE" 2>&1; then success=1; break
-        else count=$((count+1)); [[ $is_apt -eq 1 ]] && { auto_repair_apt; sleep 2; }; fi
+        if "$@" >>"$LOG_FILE" 2>&1; then
+            success=1
+            break
+        else
+            count=$((count + 1))
+            [[ $is_apt -eq 1 ]] && {
+                auto_repair_apt
+                sleep 2
+            }
+        fi
     done
     if [ $success -eq 1 ]; then
-        CURRENT_STEP=$(( CURRENT_STEP + 1 )); draw_progress "✔ $msg"
+        CURRENT_STEP=$((CURRENT_STEP + 1))
+        draw_progress "✔ $msg"
         printf "\n"
     else
         local safe_command
@@ -836,9 +926,15 @@ ask_yes_no() {
     while true; do
         read -rp "  Escolha (1 ou 2): " choice
         case "$choice" in
-            1) printf -v "$var_name" "1"; break ;;
-            2) printf -v "$var_name" "0"; break ;;
-            *) echo -e "  ${VERMELHO}Opção inválida.${RESET}" ;;
+        1)
+            printf -v "$var_name" "1"
+            break
+            ;;
+        2)
+            printf -v "$var_name" "0"
+            break
+            ;;
+        *) echo -e "  ${VERMELHO}Opção inválida.${RESET}" ;;
         esac
     done
 }
@@ -856,34 +952,43 @@ add_install_warning() {
 
 pkg_update() {
     case "$OS_FAMILY" in
-        ubuntu|debian) apt-get update ;;
-        rhel) dnf makecache ;;
-        *) echo "Sistema não suportado para atualização de repositórios: ${OS_DISPLAY}" >&2; return 1 ;;
+    ubuntu | debian) apt-get update ;;
+    rhel) dnf makecache ;;
+    *)
+        echo "Sistema não suportado para atualização de repositórios: ${OS_DISPLAY}" >&2
+        return 1
+        ;;
     esac
 }
 
 pkg_install() {
     case "$OS_FAMILY" in
-        ubuntu|debian) apt-get install "${APT_FLAGS[@]}" "$@" ;;
-        rhel) dnf install -y "$@" ;;
-        *) echo "Sistema não suportado para instalação de pacotes: ${OS_DISPLAY}" >&2; return 1 ;;
+    ubuntu | debian) apt-get install "${APT_FLAGS[@]}" "$@" ;;
+    rhel) dnf install -y "$@" ;;
+    *)
+        echo "Sistema não suportado para instalação de pacotes: ${OS_DISPLAY}" >&2
+        return 1
+        ;;
     esac
 }
 
 pkg_purge() {
     case "$OS_FAMILY" in
-        ubuntu|debian) apt-get purge -y "$@" ;;
-        rhel) dnf remove -y "$@" ;;
-        *) echo "Sistema não suportado para remoção de pacotes: ${OS_DISPLAY}" >&2; return 1 ;;
+    ubuntu | debian) apt-get purge -y "$@" ;;
+    rhel) dnf remove -y "$@" ;;
+    *)
+        echo "Sistema não suportado para remoção de pacotes: ${OS_DISPLAY}" >&2
+        return 1
+        ;;
     esac
 }
 
 pkg_is_installed() {
     local pkg="$1"
     case "$OS_FAMILY" in
-        ubuntu|debian) dpkg -s "$pkg" >/dev/null 2>&1 ;;
-        rhel) rpm -q "$pkg" >/dev/null 2>&1 ;;
-        *) return 1 ;;
+    ubuntu | debian) dpkg -s "$pkg" >/dev/null 2>&1 ;;
+    rhel) rpm -q "$pkg" >/dev/null 2>&1 ;;
+    *) return 1 ;;
     esac
 }
 
@@ -995,9 +1100,9 @@ is_forbidden_active_proxy_target() {
     host="${host#[}"
     host="${host%]}"
     case "$host" in
-        0|0.0.0.0|::|::1|localhost|localhost.localdomain)
-            return 0
-            ;;
+    0 | 0.0.0.0 | :: | ::1 | localhost | localhost.localdomain)
+        return 0
+        ;;
     esac
     [[ "$host" =~ ^127\. ]] && return 0
     is_local_ipv4_address "$host" && return 0
@@ -1084,12 +1189,12 @@ sql_quote_ident() {
 package_version() {
     local pkg="$1"
     case "$OS_FAMILY" in
-        ubuntu|debian)
-            dpkg-query -W -f='${Version}' "$pkg" 2>/dev/null || true
-            ;;
-        rhel)
-            rpm -q --qf '%{VERSION}-%{RELEASE}' "$pkg" 2>/dev/null || true
-            ;;
+    ubuntu | debian)
+        dpkg-query -W -f='${Version}' "$pkg" 2>/dev/null || true
+        ;;
+    rhel)
+        rpm -q --qf '%{VERSION}-%{RELEASE}' "$pkg" 2>/dev/null || true
+        ;;
     esac
 }
 
@@ -1133,7 +1238,7 @@ start_certificate_export() {
     install -m 600 /dev/null "$plain_history_file" 2>/dev/null || true
     chmod 600 "$plain_file" 2>/dev/null || true
     chmod 600 "$history_file" "$plain_history_file" 2>/dev/null || true
-    exec > >(tee "$summary_file" "$history_file" >(sanitize_plain_text > "$plain_file") >(sanitize_plain_text > "$plain_history_file")) 2>&1
+    exec > >(tee "$summary_file" "$history_file" >(sanitize_plain_text >"$plain_file") >(sanitize_plain_text >"$plain_history_file")) 2>&1
 
     echo -e "${CIANO}${NEGRITO}▸ EXPORTAÇÃO DO CERTIFICADO${RESET}"
     printf "  %-34s %s\n" "Arquivo:" "$summary_file"
@@ -1159,7 +1264,7 @@ check_proxy_server_connectivity() {
     echo -e "\n${CIANO}${NEGRITO}▸ TESTE PROXY → SERVER${RESET}"
     if [[ -z "$server_list" ]]; then
         echo -e "  ${AMARELO}⚠${RESET} Server do Proxy não informado; teste ignorado."
-        [[ "${DOCTOR_ACTIVE:-0}" == "1" ]] && DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
+        [[ "${DOCTOR_ACTIVE:-0}" == "1" ]] && DOCTOR_WARN=$((DOCTOR_WARN + 1))
         return 0
     fi
     if [[ "$mode" != "0" ]]; then
@@ -1175,7 +1280,8 @@ check_proxy_server_connectivity() {
     for entry in $server_list; do
         entry="${entry//[[:space:]]/}"
         [[ -z "$entry" ]] && continue
-        host="$entry"; port="10051"
+        host="$entry"
+        port="10051"
         if [[ "$entry" == *":"* && "$entry" != *"]"* ]]; then
             host="${entry%:*}"
             port="${entry##*:}"
@@ -1184,10 +1290,10 @@ check_proxy_server_connectivity() {
         host="${host%]}"
         if is_forbidden_active_proxy_target "$host"; then
             printf "  %-34s ${AMARELO}%s${RESET}\n" "${host}:${port}" "destino inválido para Proxy ativo"
-            [[ "${DOCTOR_ACTIVE:-0}" == "1" ]] && DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
+            [[ "${DOCTOR_ACTIVE:-0}" == "1" ]] && DOCTOR_WARN=$((DOCTOR_WARN + 1))
             continue
         fi
-        total=$(( total + 1 ))
+        total=$((total + 1))
         if test_tcp_connectivity "$host" "$port" 5; then
             printf "  %-34s ${VERDE}%s${RESET}\n" "${host}:${port}" "OK"
             ok=1
@@ -1195,9 +1301,9 @@ check_proxy_server_connectivity() {
             printf "  %-34s ${AMARELO}%s${RESET}\n" "${host}:${port}" "sem conexão TCP"
         fi
     done
-    [[ "$total" -gt 0 && "$ok" == "0" ]] && \
+    [[ "$total" -gt 0 && "$ok" == "0" ]] &&
         echo -e "  ${AMARELO}⚠ Nenhum destino respondeu agora. Verifique rota/firewall/porta 10051 no Server.${RESET}"
-    [[ "$total" -gt 0 && "$ok" == "0" && "${DOCTOR_ACTIVE:-0}" == "1" ]] && DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
+    [[ "$total" -gt 0 && "$ok" == "0" && "${DOCTOR_ACTIVE:-0}" == "1" ]] && DOCTOR_WARN=$((DOCTOR_WARN + 1))
     return 0
 }
 
@@ -1215,7 +1321,7 @@ start_doctor_export() {
     install -m 600 /dev/null "$history_file" 2>/dev/null || true
     chmod 600 "$report_file" 2>/dev/null || true
     chmod 600 "$history_file" 2>/dev/null || true
-    exec > >(tee >(sanitize_plain_text > "$report_file") >(sanitize_plain_text > "$history_file")) 2>&1
+    exec > >(tee >(sanitize_plain_text >"$report_file") >(sanitize_plain_text >"$history_file")) 2>&1
     echo -e "${CIANO}${NEGRITO}▸ EXPORTAÇÃO DO DOCTOR${RESET}"
     printf "  %-34s %s\n" "Arquivo:" "$report_file"
     printf "  %-34s %s\n\n" "Histórico:" "$history_file"
@@ -1308,7 +1414,7 @@ write_install_summary_json() {
         done
         echo '  ]'
         echo "}"
-    } > "$tmp_file"
+    } >"$tmp_file"
     install -m 600 "$tmp_file" "$json_file" 2>/dev/null || cp "$tmp_file" "$json_file"
     chmod 600 "$json_file" 2>/dev/null || true
     rm -f "$tmp_file"
@@ -1386,12 +1492,12 @@ show_supported_os() {
 supported_versions_for_component() {
     local component="$1"
     case "${OS_FAMILY}:${component}" in
-        ubuntu:db)     echo "18.04 20.04 22.04 24.04 26.04" ;;
-        ubuntu:server) echo "20.04 22.04 24.04 26.04" ;;
-        ubuntu:proxy)  echo "16.04 18.04 20.04 22.04 24.04 26.04" ;;
-        debian:db|debian:server|debian:proxy) echo "12 13" ;;
-        rhel:db|rhel:server|rhel:proxy) echo "" ;;
-        *) echo "" ;;
+    ubuntu:db) echo "18.04 20.04 22.04 24.04 26.04" ;;
+    ubuntu:server) echo "20.04 22.04 24.04 26.04" ;;
+    ubuntu:proxy) echo "16.04 18.04 20.04 22.04 24.04 26.04" ;;
+    debian:db | debian:server | debian:proxy) echo "12 13" ;;
+    rhel:db | rhel:server | rhel:proxy) echo "" ;;
+    *) echo "" ;;
     esac
 }
 
@@ -1437,13 +1543,13 @@ component_supported_or_die() {
 zabbix_release_url() {
     local version="$1"
     case "${OS_FAMILY}:${version}" in
-        ubuntu:8.0) echo "https://repo.zabbix.com/zabbix/8.0/release/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_8.0+ubuntu${U_VER}_all.deb" ;;
-        ubuntu:7.4) echo "https://repo.zabbix.com/zabbix/7.4/release/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.4+ubuntu${U_VER}_all.deb" ;;
-        ubuntu:7.0) echo "https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu${U_VER}_all.deb" ;;
-        debian:8.0) echo "https://repo.zabbix.com/zabbix/8.0/release/debian/pool/main/z/zabbix-release/zabbix-release_latest_8.0+debian${U_VER}_all.deb" ;;
-        debian:7.4) echo "https://repo.zabbix.com/zabbix/7.4/release/debian/pool/main/z/zabbix-release/zabbix-release_latest_7.4+debian${U_VER}_all.deb" ;;
-        debian:7.0) echo "https://repo.zabbix.com/zabbix/7.0/debian/pool/main/z/zabbix-release/zabbix-release_latest_7.0+debian${U_VER}_all.deb" ;;
-        *) return 1 ;;
+    ubuntu:8.0) echo "https://repo.zabbix.com/zabbix/8.0/release/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_8.0+ubuntu${U_VER}_all.deb" ;;
+    ubuntu:7.4) echo "https://repo.zabbix.com/zabbix/7.4/release/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.4+ubuntu${U_VER}_all.deb" ;;
+    ubuntu:7.0) echo "https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu${U_VER}_all.deb" ;;
+    debian:8.0) echo "https://repo.zabbix.com/zabbix/8.0/release/debian/pool/main/z/zabbix-release/zabbix-release_latest_8.0+debian${U_VER}_all.deb" ;;
+    debian:7.4) echo "https://repo.zabbix.com/zabbix/7.4/release/debian/pool/main/z/zabbix-release/zabbix-release_latest_7.4+debian${U_VER}_all.deb" ;;
+    debian:7.0) echo "https://repo.zabbix.com/zabbix/7.0/debian/pool/main/z/zabbix-release/zabbix-release_latest_7.0+debian${U_VER}_all.deb" ;;
+    *) return 1 ;;
     esac
 }
 
@@ -1451,26 +1557,29 @@ zabbix_packages_index_url() {
     local version="$1" arch
     arch=$(dpkg --print-architecture 2>/dev/null || echo "amd64")
     case "${OS_FAMILY}:${version}" in
-        ubuntu:8.0) echo "https://repo.zabbix.com/zabbix/8.0/unstable/ubuntu/dists/${U_CODENAME}/main/binary-${arch}/Packages.gz" ;;
-        ubuntu:7.4) echo "https://repo.zabbix.com/zabbix/7.4/stable/ubuntu/dists/${U_CODENAME}/main/binary-${arch}/Packages.gz" ;;
-        ubuntu:7.0) echo "https://repo.zabbix.com/zabbix/7.0/ubuntu/dists/${U_CODENAME}/main/binary-${arch}/Packages.gz" ;;
-        debian:8.0) echo "https://repo.zabbix.com/zabbix/8.0/unstable/debian/dists/${U_CODENAME}/main/binary-${arch}/Packages.gz" ;;
-        debian:7.4) echo "https://repo.zabbix.com/zabbix/7.4/stable/debian/dists/${U_CODENAME}/main/binary-${arch}/Packages.gz" ;;
-        debian:7.0) echo "https://repo.zabbix.com/zabbix/7.0/debian/dists/${U_CODENAME}/main/binary-${arch}/Packages.gz" ;;
-        *) return 1 ;;
+    ubuntu:8.0) echo "https://repo.zabbix.com/zabbix/8.0/unstable/ubuntu/dists/${U_CODENAME}/main/binary-${arch}/Packages.gz" ;;
+    ubuntu:7.4) echo "https://repo.zabbix.com/zabbix/7.4/stable/ubuntu/dists/${U_CODENAME}/main/binary-${arch}/Packages.gz" ;;
+    ubuntu:7.0) echo "https://repo.zabbix.com/zabbix/7.0/ubuntu/dists/${U_CODENAME}/main/binary-${arch}/Packages.gz" ;;
+    debian:8.0) echo "https://repo.zabbix.com/zabbix/8.0/unstable/debian/dists/${U_CODENAME}/main/binary-${arch}/Packages.gz" ;;
+    debian:7.4) echo "https://repo.zabbix.com/zabbix/7.4/stable/debian/dists/${U_CODENAME}/main/binary-${arch}/Packages.gz" ;;
+    debian:7.0) echo "https://repo.zabbix.com/zabbix/7.0/debian/dists/${U_CODENAME}/main/binary-${arch}/Packages.gz" ;;
+    *) return 1 ;;
     esac
 }
 
 validate_official_zabbix_package() {
     local package="$1" version="${2:-${ZBX_VERSION:-}}" index_url package_index cache_file
-    [[ -n "$version" ]] || { echo -e "${VERMELHO}${NEGRITO}ERRO:${RESET} versão Zabbix não definida para validar ${package}."; exit 1; }
+    [[ -n "$version" ]] || {
+        echo -e "${VERMELHO}${NEGRITO}ERRO:${RESET} versão Zabbix não definida para validar ${package}."
+        exit 1
+    }
     index_url="$(zabbix_packages_index_url "$version" 2>/dev/null || true)"
     if [[ -z "$index_url" ]]; then
         echo -e "${VERMELHO}${NEGRITO}ERRO:${RESET} não há índice Zabbix conhecido para ${OS_DISPLAY} + Zabbix ${version}."
         exit 1
     fi
     cache_file="${VALIDATION_CACHE_DIR}/zabbix_${OS_FAMILY}_${U_CODENAME}_${version}_$(dpkg --print-architecture 2>/dev/null || echo amd64).Packages"
-    if [[ -s "$cache_file" && $(( $(date +%s) - $(stat -c %Y "$cache_file" 2>/dev/null || echo 0) )) -lt 1800 ]]; then
+    if [[ -s "$cache_file" && $(($(date +%s) - $(stat -c %Y "$cache_file" 2>/dev/null || echo 0))) -lt 1800 ]]; then
         package_index="$(cat "$cache_file" 2>/dev/null || true)"
     elif ! package_index="$(_curl -fsL --max-time 25 "$index_url" 2>/dev/null | timeout 10 gzip -dc 2>/dev/null)"; then
         echo -e "\n${VERMELHO}${NEGRITO}ERRO:${RESET} não foi possível consultar o índice oficial do Zabbix antes de alterar o APT."
@@ -1478,9 +1587,9 @@ validate_official_zabbix_package() {
         echo -e "  Sistema: ${OS_DISPLAY}"
         exit 1
     else
-        printf '%s\n' "$package_index" > "$cache_file" 2>/dev/null || true
+        printf '%s\n' "$package_index" >"$cache_file" 2>/dev/null || true
     fi
-    if ! grep -q "^Package: ${package}$" <<< "$package_index"; then
+    if ! grep -q "^Package: ${package}$" <<<"$package_index"; then
         echo -e "\n${VERMELHO}${NEGRITO}ERRO:${RESET} pacote ${package} não existe no índice oficial do Zabbix ${version}."
         echo -e "  URL testada: ${index_url}"
         echo -e "  Sistema: ${OS_DISPLAY}"
@@ -1495,26 +1604,26 @@ validate_supported_architecture() {
     local arch
     arch=$(dpkg --print-architecture 2>/dev/null || uname -m 2>/dev/null || echo "unknown")
     case "$arch" in
-        amd64|arm64)
-            echo -e "  ${VERDE}✔${RESET} Arquitetura suportada para validação: ${arch}"
-            ;;
-        *)
-            echo -e "\n${VERMELHO}${NEGRITO}ERRO:${RESET} arquitetura não validada por este instalador: ${arch}"
-            echo -e "  Use amd64/arm64 ou valide manualmente os repositórios oficiais antes de prosseguir."
-            exit 1
-            ;;
+    amd64 | arm64)
+        echo -e "  ${VERDE}✔${RESET} Arquitetura suportada para validação: ${arch}"
+        ;;
+    *)
+        echo -e "\n${VERMELHO}${NEGRITO}ERRO:${RESET} arquitetura não validada por este instalador: ${arch}"
+        echo -e "  Use amd64/arm64 ou valide manualmente os repositórios oficiais antes de prosseguir."
+        exit 1
+        ;;
     esac
 }
 
 default_php_for_system() {
     case "$OS_FAMILY:$U_VER" in
-        debian:12) echo "8.2" ;;
-        debian:13) echo "8.4" ;;
-        ubuntu:20.04) echo "8.1" ;;
-        ubuntu:22.04) echo "8.1" ;;
-        ubuntu:24.04) echo "8.3" ;;
-        ubuntu:26.04) echo "8.5" ;;
-        *) echo "8.1" ;;
+    debian:12) echo "8.2" ;;
+    debian:13) echo "8.4" ;;
+    ubuntu:20.04) echo "8.1" ;;
+    ubuntu:22.04) echo "8.1" ;;
+    ubuntu:24.04) echo "8.3" ;;
+    ubuntu:26.04) echo "8.5" ;;
+    *) echo "8.1" ;;
     esac
 }
 
@@ -1538,7 +1647,10 @@ validate_compatibility_matrix() {
         echo -e "  Zabbix: ${ZBX_VERSION:-${ZBX_TARGET_VERSION:-N/D}} | PostgreSQL: ${PG_VER:-N/D} | PHP: ${PHP_VER:-N/D}"
         local ack
         read -rp "  Digite CONTINUAR para aceitar esta combinação experimental: " ack
-        [[ "$ack" == "CONTINUAR" ]] || { echo -e "${AMARELO}Operação cancelada pelo operador.${RESET}"; exit 0; }
+        [[ "$ack" == "CONTINUAR" ]] || {
+            echo -e "${AMARELO}Operação cancelada pelo operador.${RESET}"
+            exit 0
+        }
     fi
 }
 
@@ -1551,7 +1663,8 @@ validate_frontend_runtime_packages() {
 }
 
 validate_remote_packages_index() {
-    local label="$1" url="$2"; shift 2
+    local label="$1" url="$2"
+    shift 2
     local package_index pkg missing=0 optional=0 cache_key cache_file
     if [[ "${1:-}" == "--optional" ]]; then
         optional=1
@@ -1560,17 +1673,17 @@ validate_remote_packages_index() {
     echo -e "  ${CIANO}Consultando:${RESET} ${url}"
     cache_key="$(printf '%s' "$url" | sed 's/[^a-zA-Z0-9_.-]/_/g')"
     cache_file="${VALIDATION_CACHE_DIR}/${cache_key}"
-    if [[ -s "$cache_file" && $(( $(date +%s) - $(stat -c %Y "$cache_file" 2>/dev/null || echo 0) )) -lt 1800 ]]; then
+    if [[ -s "$cache_file" && $(($(date +%s) - $(stat -c %Y "$cache_file" 2>/dev/null || echo 0))) -lt 1800 ]]; then
         package_index="$(cat "$cache_file" 2>/dev/null || true)"
     elif ! package_index="$(_curl -fsL --max-time 30 "$url" 2>/dev/null | timeout 10 gzip -dc 2>/dev/null)"; then
         echo -e "${VERMELHO}${NEGRITO}ERRO:${RESET} não foi possível ler índice oficial: ${label}"
         echo -e "  URL: ${url}"
         exit 1
     else
-        printf '%s\n' "$package_index" > "$cache_file" 2>/dev/null || true
+        printf '%s\n' "$package_index" >"$cache_file" 2>/dev/null || true
     fi
     for pkg in "$@"; do
-        if grep -q "^Package: ${pkg}$" <<< "$package_index"; then
+        if grep -q "^Package: ${pkg}$" <<<"$package_index"; then
             echo -e "  ${VERDE}✔${RESET} ${pkg}"
         else
             echo -e "  ${VERMELHO}✖${RESET} ${pkg} ausente"
@@ -1612,47 +1725,50 @@ run_repo_check() {
     pkg_update >/dev/null
     validate_packages_available curl wget ca-certificates gnupg openssl
     case "$component" in
-        db)
-            zbx_ver="7.4"; pg_ver="17"
-            echo -e "\n${CIANO}${NEGRITO}▸ POSTGRESQL / PGDG${RESET}"
-            validate_remote_packages_index "PGDG" "$(pgdg_packages_index_url)" "postgresql-${pg_ver}" "postgresql-client-${pg_ver}"
-            echo -e "\n${CIANO}${NEGRITO}▸ TIMESCALEDB${RESET}"
-            ts_pkg="timescaledb-2-postgresql-${pg_ver}"
-            if validate_remote_packages_index "TimescaleDB" "$(timescale_packages_index_url)" --optional "$ts_pkg"; then
-                :
-            else
-                echo -e "  ${AMARELO}⚠ TimescaleDB indisponível para esta combinação; instalação poderia seguir sem ele.${RESET}"
-            fi
-            echo -e "\n${CIANO}${NEGRITO}▸ ZABBIX AGENT 2${RESET}"
-            validate_official_zabbix_package zabbix-agent2 "$zbx_ver"
-            ;;
-        server)
-            zbx_ver="7.4"; pg_ver="17"; php_ver="$(default_php_for_system)"
-            echo -e "\n${CIANO}${NEGRITO}▸ POSTGRESQL CLIENT${RESET}"
-            validate_remote_packages_index "PGDG" "$(pgdg_packages_index_url)" "postgresql-client-${pg_ver}"
-            echo -e "\n${CIANO}${NEGRITO}▸ ZABBIX SERVER${RESET}"
-            validate_official_zabbix_package zabbix-server-pgsql "$zbx_ver"
-            echo -e "\n${CIANO}${NEGRITO}▸ FRONTEND${RESET}"
-            validate_frontend_runtime_packages "$php_ver"
-            ;;
-        proxy)
-            zbx_ver="7.4"
-            echo -e "\n${CIANO}${NEGRITO}▸ ZABBIX PROXY${RESET}"
-            validate_official_zabbix_package zabbix-proxy-sqlite3 "$zbx_ver"
-            validate_packages_available sqlite3
-            ;;
-        *)
-            echo -e "${VERMELHO}${NEGRITO}ERRO:${RESET} componente inválido para --repo-check: ${component}"
-            exit 1
-            ;;
+    db)
+        zbx_ver="7.4"
+        pg_ver="17"
+        echo -e "\n${CIANO}${NEGRITO}▸ POSTGRESQL / PGDG${RESET}"
+        validate_remote_packages_index "PGDG" "$(pgdg_packages_index_url)" "postgresql-${pg_ver}" "postgresql-client-${pg_ver}"
+        echo -e "\n${CIANO}${NEGRITO}▸ TIMESCALEDB${RESET}"
+        ts_pkg="timescaledb-2-postgresql-${pg_ver}"
+        if validate_remote_packages_index "TimescaleDB" "$(timescale_packages_index_url)" --optional "$ts_pkg"; then
+            :
+        else
+            echo -e "  ${AMARELO}⚠ TimescaleDB indisponível para esta combinação; instalação poderia seguir sem ele.${RESET}"
+        fi
+        echo -e "\n${CIANO}${NEGRITO}▸ ZABBIX AGENT 2${RESET}"
+        validate_official_zabbix_package zabbix-agent2 "$zbx_ver"
+        ;;
+    server)
+        zbx_ver="7.4"
+        pg_ver="17"
+        php_ver="$(default_php_for_system)"
+        echo -e "\n${CIANO}${NEGRITO}▸ POSTGRESQL CLIENT${RESET}"
+        validate_remote_packages_index "PGDG" "$(pgdg_packages_index_url)" "postgresql-client-${pg_ver}"
+        echo -e "\n${CIANO}${NEGRITO}▸ ZABBIX SERVER${RESET}"
+        validate_official_zabbix_package zabbix-server-pgsql "$zbx_ver"
+        echo -e "\n${CIANO}${NEGRITO}▸ FRONTEND${RESET}"
+        validate_frontend_runtime_packages "$php_ver"
+        ;;
+    proxy)
+        zbx_ver="7.4"
+        echo -e "\n${CIANO}${NEGRITO}▸ ZABBIX PROXY${RESET}"
+        validate_official_zabbix_package zabbix-proxy-sqlite3 "$zbx_ver"
+        validate_packages_available sqlite3
+        ;;
+    *)
+        echo -e "${VERMELHO}${NEGRITO}ERRO:${RESET} componente inválido para --repo-check: ${component}"
+        exit 1
+        ;;
     esac
     echo -e "\n${VERDE}${NEGRITO}Repo-check concluído. Nenhuma instalação foi executada.${RESET}\n"
 }
 
 timescale_repo_os() {
     case "$OS_FAMILY" in
-        ubuntu|debian) echo "$OS_FAMILY" ;;
-        *) return 1 ;;
+    ubuntu | debian) echo "$OS_FAMILY" ;;
+    *) return 1 ;;
     esac
 }
 
@@ -1702,7 +1818,7 @@ install_optional_packages() {
     local pkg
     for pkg in "$@"; do
         if check_package_available "$pkg" "$pkg" 1; then
-            apt-get install "${APT_FLAGS[@]}" "$pkg" || \
+            apt-get install "${APT_FLAGS[@]}" "$pkg" ||
                 log_msg "WARN" "Falha ao instalar pacote opcional ${pkg}; continuando."
         else
             add_install_warning "Pacote opcional '${pkg}' indisponível no repositório; instalação continuou sem ele."
@@ -1751,12 +1867,12 @@ warn_weak_secret() {
     local secret="$1" label="${2:-Senha}"
     local score=0
     [[ -z "$secret" ]] && return 0
-    (( ${#secret} >= 12 )) && score=$(( score + 1 ))
-    [[ "$secret" =~ [a-z] ]] && score=$(( score + 1 ))
-    [[ "$secret" =~ [A-Z] ]] && score=$(( score + 1 ))
-    [[ "$secret" =~ [0-9] ]] && score=$(( score + 1 ))
-    [[ "$secret" =~ [^a-zA-Z0-9] ]] && score=$(( score + 1 ))
-    if (( score < 3 )); then
+    ((${#secret} >= 12)) && score=$((score + 1))
+    [[ "$secret" =~ [a-z] ]] && score=$((score + 1))
+    [[ "$secret" =~ [A-Z] ]] && score=$((score + 1))
+    [[ "$secret" =~ [0-9] ]] && score=$((score + 1))
+    [[ "$secret" =~ [^a-zA-Z0-9] ]] && score=$((score + 1))
+    if ((score < 3)); then
         echo -e "  ${AMARELO}⚠ ${label} parece fraca. O script permite continuar, mas recomenda 12+ caracteres com letras, números e símbolos.${RESET}"
     fi
 }
@@ -1766,19 +1882,19 @@ print_support_commands() {
     echo -e "\n${CIANO}${NEGRITO}▸ COMANDOS ÚTEIS DE SUPORTE${RESET}"
     printf "  %-26s %s\n" "Log da instalação:" "tail -n 120 ${LOG_FILE}"
     case "$component" in
-        db)
-            printf "  %-26s %s\n" "PostgreSQL:" "systemctl status postgresql --no-pager"
-            printf "  %-26s %s\n" "Logs PostgreSQL:" "journalctl -u postgresql -n 80 --no-pager"
-            ;;
-        server)
-            printf "  %-26s %s\n" "Zabbix Server:" "systemctl status zabbix-server --no-pager"
-            printf "  %-26s %s\n" "Nginx:" "systemctl status nginx --no-pager"
-            printf "  %-26s %s\n" "Logs Server:" "journalctl -u zabbix-server -n 80 --no-pager"
-            ;;
-        proxy)
-            printf "  %-26s %s\n" "Zabbix Proxy:" "systemctl status zabbix-proxy --no-pager"
-            printf "  %-26s %s\n" "Logs Proxy:" "journalctl -u zabbix-proxy -n 80 --no-pager"
-            ;;
+    db)
+        printf "  %-26s %s\n" "PostgreSQL:" "systemctl status postgresql --no-pager"
+        printf "  %-26s %s\n" "Logs PostgreSQL:" "journalctl -u postgresql -n 80 --no-pager"
+        ;;
+    server)
+        printf "  %-26s %s\n" "Zabbix Server:" "systemctl status zabbix-server --no-pager"
+        printf "  %-26s %s\n" "Nginx:" "systemctl status nginx --no-pager"
+        printf "  %-26s %s\n" "Logs Server:" "journalctl -u zabbix-server -n 80 --no-pager"
+        ;;
+    proxy)
+        printf "  %-26s %s\n" "Zabbix Proxy:" "systemctl status zabbix-proxy --no-pager"
+        printf "  %-26s %s\n" "Logs Proxy:" "journalctl -u zabbix-proxy -n 80 --no-pager"
+        ;;
     esac
     printf "  %-26s %s\n" "Doctor:" "$0 ${component} --doctor"
 }
@@ -1793,9 +1909,9 @@ check_zabbix_repo_url() {
         echo -e "  • ${OS_LABEL} ${U_VER} pode ser recente demais para Zabbix ${ZBX_VERSION}."
         echo -e "  • DNS/proxy/rede pode estar bloqueando https://repo.zabbix.com."
         case "$ZBX_VERSION" in
-            "8.0") echo -e "  Sugestão operacional: testar Zabbix 7.4 ou validar publicação do 8.0 para ${OS_LABEL} ${U_VER}." ;;
-            "7.4") echo -e "  Sugestão operacional: testar Zabbix 7.0 LTS se 7.4 ainda não estiver publicado para ${OS_LABEL} ${U_VER}." ;;
-            "7.0") echo -e "  Sugestão operacional: validar conectividade externa e codename (${U_CODENAME})." ;;
+        "8.0") echo -e "  Sugestão operacional: testar Zabbix 7.4 ou validar publicação do 8.0 para ${OS_LABEL} ${U_VER}." ;;
+        "7.4") echo -e "  Sugestão operacional: testar Zabbix 7.0 LTS se 7.4 ainda não estiver publicado para ${OS_LABEL} ${U_VER}." ;;
+        "7.0") echo -e "  Sugestão operacional: validar conectividade externa e codename (${U_CODENAME})." ;;
         esac
         exit 1
     fi
@@ -1841,9 +1957,9 @@ validate_ipv4_cidr() {
         echo -e "  Use IPv4, exemplo: 192.168.1.10 ou 192.168.1.0/24."
         exit 1
     fi
-    IFS='.' read -r -a octets <<< "$ip"
+    IFS='.' read -r -a octets <<<"$ip"
     for octet in "${octets[@]}"; do
-        if (( octet < 0 || octet > 255 )); then
+        if ((octet < 0 || octet > 255)); then
             echo -e "${VERMELHO}${NEGRITO}ERRO:${RESET} ${label} inválido: ${value}"
             echo -e "  Cada octeto IPv4 deve estar entre 0 e 255."
             exit 1
@@ -1859,7 +1975,7 @@ check_disk_space() {
         echo -e "${AMARELO}⚠ Não foi possível verificar espaço livre em disco.${RESET}"
         return 0
     fi
-    if (( avail_mb < min_mb )); then
+    if ((avail_mb < min_mb)); then
         echo -e "${VERMELHO}${NEGRITO}ERRO:${RESET} Espaço livre insuficiente em /."
         echo -e "  Livre: ${avail_mb} MB | Mínimo recomendado: ${min_mb} MB"
         exit 1
@@ -1873,7 +1989,7 @@ check_min_ram() {
         echo -e "${AMARELO}⚠ Não foi possível verificar RAM total.${RESET}"
         return 0
     fi
-    if (( RAM_MB < min_mb )); then
+    if ((RAM_MB < min_mb)); then
         echo -e "${VERMELHO}${NEGRITO}ERRO:${RESET} RAM insuficiente."
         echo -e "  Detectado: ${RAM_MB} MB | Mínimo recomendado: ${min_mb} MB"
         exit 1
@@ -1891,7 +2007,10 @@ check_required_commands() {
             missing=1
         fi
     done
-    [[ "$missing" == "0" ]] || { echo -e "\n${VERMELHO}${NEGRITO}ERRO:${RESET} comandos obrigatórios ausentes."; exit 1; }
+    [[ "$missing" == "0" ]] || {
+        echo -e "\n${VERMELHO}${NEGRITO}ERRO:${RESET} comandos obrigatórios ausentes."
+        exit 1
+    }
 }
 
 check_bootstrap_downloader() {
@@ -1945,12 +2064,15 @@ port_process_info() {
 confirm_port_if_busy() {
     local port="$1" component="$2" label="$3" info allowed=0 ok
     info=$(port_process_info "$port" || true)
-    [[ -z "$info" ]] && { echo -e "  ${VERDE}✔ Porta ${port}/TCP livre (${label})${RESET}"; return 0; }
+    [[ -z "$info" ]] && {
+        echo -e "  ${VERDE}✔ Porta ${port}/TCP livre (${label})${RESET}"
+        return 0
+    }
     case "$component:$port" in
-        db:5432) [[ "$info" =~ postgres|postmaster ]] && allowed=1 ;;
-        server:80|server:443) [[ "$info" =~ nginx|apache2|php-fpm|zabbix ]] && allowed=1 ;;
-        server:10051) [[ "$info" =~ zabbix_server|zabbix-server ]] && allowed=1 ;;
-        proxy:10051) [[ "$info" =~ zabbix_proxy|zabbix-proxy ]] && allowed=1 ;;
+    db:5432) [[ "$info" =~ postgres|postmaster ]] && allowed=1 ;;
+    server:80 | server:443) [[ "$info" =~ nginx|apache2|php-fpm|zabbix ]] && allowed=1 ;;
+    server:10051) [[ "$info" =~ zabbix_server|zabbix-server ]] && allowed=1 ;;
+    proxy:10051) [[ "$info" =~ zabbix_proxy|zabbix-proxy ]] && allowed=1 ;;
     esac
     if [[ "$allowed" == "1" ]]; then
         echo -e "  ${AMARELO}⚠ Porta ${port}/TCP ocupada por instalação relacionada (${label}); a limpeza deve tratar isso.${RESET}"
@@ -1961,7 +2083,10 @@ confirm_port_if_busy() {
     echo -e "  ${NEGRITO}Componente:${RESET} ${component}"
     echo -e "  ${NEGRITO}Processo:${RESET} ${info}"
     ask_yes_no "Continuar mesmo assim?" ok
-    [[ "$ok" == "1" ]] || { echo -e "${VERMELHO}Instalação abortada pelo operador.${RESET}"; exit 1; }
+    [[ "$ok" == "1" ]] || {
+        echo -e "${VERMELHO}Instalação abortada pelo operador.${RESET}"
+        exit 1
+    }
 }
 
 primary_ipv4() {
@@ -1976,7 +2101,7 @@ primary_ipv4() {
 is_private_ipv4() {
     local ip_addr="$1" a b
     [[ "$ip_addr" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
-    IFS=. read -r a b _ <<< "$ip_addr"
+    IFS=. read -r a b _ <<<"$ip_addr"
     [[ "$a" == "10" ]] && return 0
     [[ "$a" == "172" && "$b" -ge 16 && "$b" -le 31 ]] && return 0
     [[ "$a" == "192" && "$b" == "168" ]] && return 0
@@ -1986,7 +2111,10 @@ is_private_ipv4() {
 print_environment_context() {
     local ip_addr env_label
     ip_addr=$(primary_ipv4)
-    [[ -z "$ip_addr" ]] && { echo -e "  ${AMARELO}⚠ IP principal não detectado.${RESET}"; return 0; }
+    [[ -z "$ip_addr" ]] && {
+        echo -e "  ${AMARELO}⚠ IP principal não detectado.${RESET}"
+        return 0
+    }
     if is_private_ipv4 "$ip_addr"; then
         env_label="LAB/REDE PRIVADA"
         echo -e "  ${VERDE}✔ Ambiente detectado:${RESET} ${env_label} (${ip_addr})"
@@ -2001,18 +2129,18 @@ print_environment_context() {
 detect_previous_installation() {
     local component="$1" found=0
     case "$component" in
-        db)
-            dpkg -l 2>/dev/null | awk 'BEGIN{IGNORECASE=1} /^ii|^rc/ && $2 ~ /^(postgresql|timescaledb)/ {found=1} END{exit !found}' && found=1 || true
-            [[ -d /etc/postgresql || -d /var/lib/postgresql ]] && found=1
-            ;;
-        server)
-            dpkg -l 2>/dev/null | awk 'BEGIN{IGNORECASE=1} /^ii|^rc/ && $2 ~ /^(zabbix|nginx|php.*fpm)/ {found=1} END{exit !found}' && found=1 || true
-            [[ -d /etc/zabbix || -d /var/lib/zabbix || -d /var/log/zabbix ]] && found=1
-            ;;
-        proxy)
-            dpkg -l 2>/dev/null | awk 'BEGIN{IGNORECASE=1} /^ii|^rc/ && $2 ~ /^zabbix/ {found=1} END{exit !found}' && found=1 || true
-            [[ -d /etc/zabbix || -d /var/lib/zabbix || -d /var/log/zabbix ]] && found=1
-            ;;
+    db)
+        dpkg -l 2>/dev/null | awk 'BEGIN{IGNORECASE=1} /^ii|^rc/ && $2 ~ /^(postgresql|timescaledb)/ {found=1} END{exit !found}' && found=1 || true
+        [[ -d /etc/postgresql || -d /var/lib/postgresql ]] && found=1
+        ;;
+    server)
+        dpkg -l 2>/dev/null | awk 'BEGIN{IGNORECASE=1} /^ii|^rc/ && $2 ~ /^(zabbix|nginx|php.*fpm)/ {found=1} END{exit !found}' && found=1 || true
+        [[ -d /etc/zabbix || -d /var/lib/zabbix || -d /var/log/zabbix ]] && found=1
+        ;;
+    proxy)
+        dpkg -l 2>/dev/null | awk 'BEGIN{IGNORECASE=1} /^ii|^rc/ && $2 ~ /^zabbix/ {found=1} END{exit !found}' && found=1 || true
+        [[ -d /etc/zabbix || -d /var/lib/zabbix || -d /var/log/zabbix ]] && found=1
+        ;;
     esac
     [[ "$found" == "1" ]]
 }
@@ -2021,9 +2149,9 @@ warn_previous_installation() {
     local component="$1" ack="" pkg_list=""
     if detect_previous_installation "$component"; then
         case "$component" in
-            db)     pkg_list=$(dpkg -l 2>/dev/null | awk 'BEGIN{IGNORECASE=1} /^ii|^rc/ && $2 ~ /^(postgresql|timescaledb)/ {printf "%s ", $2}' || true) ;;
-            server) pkg_list=$(dpkg -l 2>/dev/null | awk 'BEGIN{IGNORECASE=1} /^ii|^rc/ && $2 ~ /^(zabbix|nginx|php.*fpm)/ {printf "%s ", $2}' || true) ;;
-            proxy)  pkg_list=$(dpkg -l 2>/dev/null | awk 'BEGIN{IGNORECASE=1} /^ii|^rc/ && $2 ~ /^zabbix/ {printf "%s ", $2}' || true) ;;
+        db) pkg_list=$(dpkg -l 2>/dev/null | awk 'BEGIN{IGNORECASE=1} /^ii|^rc/ && $2 ~ /^(postgresql|timescaledb)/ {printf "%s ", $2}' || true) ;;
+        server) pkg_list=$(dpkg -l 2>/dev/null | awk 'BEGIN{IGNORECASE=1} /^ii|^rc/ && $2 ~ /^(zabbix|nginx|php.*fpm)/ {printf "%s ", $2}' || true) ;;
+        proxy) pkg_list=$(dpkg -l 2>/dev/null | awk 'BEGIN{IGNORECASE=1} /^ii|^rc/ && $2 ~ /^zabbix/ {printf "%s ", $2}' || true) ;;
         esac
         echo -e "\n${AMARELO}${NEGRITO}⚠ Instalação anterior detectada no escopo ${component}.${RESET}"
         [[ -n "$pkg_list" ]] && echo -e "  ${AMARELO}Pacotes encontrados:${RESET} ${pkg_list}"
@@ -2047,7 +2175,8 @@ warn_previous_installation() {
 }
 
 safe_confirm_cleanup() {
-    local title="$1"; shift
+    local title="$1"
+    shift
     local ack=""
     [[ "${SAFE_MODE:-0}" == "1" ]] || return 0
     echo -e "\n${VERMELHO}${NEGRITO}SAFE MODE — confirmação de limpeza destrutiva${RESET}"
@@ -2109,7 +2238,10 @@ preflight_install_check() {
     local component="$1" disk_mb="${2:-2048}" ram_mb="${3:-1024}"
     [[ "$SIMULATE_MODE" == "1" ]] && return 0
     echo -e "\n${CIANO}${NEGRITO}>>> PRÉ-CHECK DE INSTALAÇÃO <<<${RESET}"
-    [[ "$EUID" -eq 0 ]] || { echo -e "${VERMELHO}${NEGRITO}ERRO:${RESET} execute como root/sudo."; exit 1; }
+    [[ "$EUID" -eq 0 ]] || {
+        echo -e "${VERMELHO}${NEGRITO}ERRO:${RESET} execute como root/sudo."
+        exit 1
+    }
     component_supported_or_die "$component"
     check_disk_space "$disk_mb"
     check_min_ram "$ram_mb"
@@ -2122,9 +2254,13 @@ preflight_install_check() {
     check_bootstrap_downloader
     echo -e "\n${CIANO}${NEGRITO}▸ Portas críticas${RESET}"
     case "$component" in
-        db)     confirm_port_if_busy 5432 db "PostgreSQL" ;;
-        server) confirm_port_if_busy 80 server "HTTP"; confirm_port_if_busy 443 server "HTTPS"; confirm_port_if_busy 10051 server "Zabbix Server" ;;
-        proxy)  confirm_port_if_busy 10051 proxy "Zabbix Proxy" ;;
+    db) confirm_port_if_busy 5432 db "PostgreSQL" ;;
+    server)
+        confirm_port_if_busy 80 server "HTTP"
+        confirm_port_if_busy 443 server "HTTPS"
+        confirm_port_if_busy 10051 server "Zabbix Server"
+        ;;
+    proxy) confirm_port_if_busy 10051 proxy "Zabbix Proxy" ;;
     esac
 }
 
@@ -2146,7 +2282,10 @@ run_wipe_mode() {
         echo -e "  ${AMARELO}PostgreSQL/TimescaleDB e dados da BD serão preservados.${RESET}"
     fi
     ask_yes_no "Confirmar execução do wipe agora?" confirm
-    [[ "$confirm" == "1" ]] || { echo -e "\n${AMARELO}Wipe cancelado. Nenhuma alteração feita.${RESET}"; exit 0; }
+    [[ "$confirm" == "1" ]] || {
+        echo -e "\n${AMARELO}Wipe cancelado. Nenhuma alteração feita.${RESET}"
+        exit 0
+    }
     safe_confirm_cleanup "Wipe completo solicitado" \
         "serviços zabbix-server/zabbix-agent2/zabbix-proxy/nginx/postgresql" \
         "/etc/zabbix /var/log/zabbix /var/lib/zabbix /run/zabbix" \
@@ -2155,7 +2294,7 @@ run_wipe_mode() {
     COMPONENT="wipe"
     init_install_log "wipe" "/var/log/zabbix_wipe_$(date +%Y%m%d_%H%M%S).log"
     TOTAL_STEPS=5
-    [[ "$remove_db" == "1" ]] && TOTAL_STEPS=$(( TOTAL_STEPS + 2 ))
+    [[ "$remove_db" == "1" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 2))
 
     run_step "Parando serviços Zabbix, Nginx e PostgreSQL" bash -c \
         "for svc in zabbix-server zabbix-agent2 zabbix-proxy nginx postgresql; do \
@@ -2193,7 +2332,9 @@ run_wipe_mode() {
                    /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc 2>/dev/null || true; \
          fi"
 
-    CURRENT_STEP=$TOTAL_STEPS; draw_progress "Wipe concluído ✔"; printf "\n"
+    CURRENT_STEP=$TOTAL_STEPS
+    draw_progress "Wipe concluído ✔"
+    printf "\n"
     echo -e "\n${VERDE}${NEGRITO}Wipe concluído.${RESET}"
     echo -e "${NEGRITO}Log completo:${RESET} ${LOG_FILE}\n"
 }
@@ -2255,7 +2396,7 @@ run_check_mode() {
             echo -e "  ${AMARELO}⚠${RESET} Zabbix ${zbx_ver} pode não estar publicado para ${OS_LABEL} ${U_VER}"
         fi
     done
-    [[ "$zbx_ok" == "0" ]] && \
+    [[ "$zbx_ok" == "0" ]] &&
         echo -e "  ${VERMELHO}${NEGRITO}Nenhuma versão Zabbix detectada para ${OS_LABEL} ${U_VER} — verifique antes de instalar.${RESET}"
 
     if [[ "$missing" == "1" ]]; then
@@ -2277,11 +2418,11 @@ run_self_test() {
     }
     _self_warn() {
         printf "  ${AMARELO}⚠${RESET} %s\n" "$1"
-        warn=$(( warn + 1 ))
+        warn=$((warn + 1))
     }
     _self_fail() {
         printf "  ${VERMELHO}✖${RESET} %s\n" "$1"
-        fail=$(( fail + 1 ))
+        fail=$((fail + 1))
     }
 
     echo -e "${CIANO}${NEGRITO}╔══════════════════════════════════════════════════════════╗${RESET}"
@@ -2316,14 +2457,14 @@ run_self_test() {
         fi
     done
 
-    printf 'DBPassword=abc=def\n# DBPassword=ignored\nDBUser=zabbix\n' > "$test_file"
+    printf 'DBPassword=abc=def\n# DBPassword=ignored\nDBUser=zabbix\n' >"$test_file"
     if [[ "$(conf_value "$test_file" DBPassword)" == "abc=def" && "$(conf_value "$test_file" DBUser)" == "zabbix" ]]; then
         _self_ok "conf_value preserva valores com '=' e ignora comentários"
     else
         _self_fail "conf_value não preservou valor esperado"
     fi
 
-    printf '\033[31mERRO\033[0m\r texto\001\n' | sanitize_plain_text > "$out_file"
+    printf '\033[31mERRO\033[0m\r texto\001\n' | sanitize_plain_text >"$out_file"
     if LC_ALL=C awk 'BEGIN{bad=0} /ERRO texto/{seen=1} /[\001-\010\013\014\016-\037\177]/{bad=1} END{exit !(seen && !bad)}' "$out_file"; then
         _self_ok "sanitize_plain_text remove ANSI, CR e controles perigosos"
     else
@@ -2344,25 +2485,25 @@ run_self_test() {
         _self_fail "json_escape retornou valor inesperado"
     fi
 
-    if ! validate_proxy_server_value "0" "0" "Server do Proxy" >/dev/null 2>&1 && \
-       ! validate_proxy_server_value "127.0.0.1" "0" "Server do Proxy" >/dev/null 2>&1 && \
-       ! validate_proxy_server_value "localhost" "0" "Server do Proxy" >/dev/null 2>&1 && \
-       validate_proxy_server_value "10.1.30.111" "0" "Server do Proxy" >/dev/null 2>&1; then
+    if ! validate_proxy_server_value "0" "0" "Server do Proxy" >/dev/null 2>&1 &&
+        ! validate_proxy_server_value "127.0.0.1" "0" "Server do Proxy" >/dev/null 2>&1 &&
+        ! validate_proxy_server_value "localhost" "0" "Server do Proxy" >/dev/null 2>&1 &&
+        validate_proxy_server_value "10.1.30.111" "0" "Server do Proxy" >/dev/null 2>&1; then
         _self_ok "Proxy ativo rejeita destinos locais e aceita IP real"
     else
         _self_fail "Validação do Server do Proxy ativo falhou"
     fi
 
     case "$OS_FAMILY" in
-        ubuntu|debian)
-            _self_ok "Sistema reconhecido como suportável: ${OS_DISPLAY}"
-            ;;
-        rhel)
-            _self_warn "Sistema RHEL detectado; fluxos ainda abortam de forma controlada"
-            ;;
-        *)
-            _self_warn "Sistema não suportado detectado: ${OS_DISPLAY}"
-            ;;
+    ubuntu | debian)
+        _self_ok "Sistema reconhecido como suportável: ${OS_DISPLAY}"
+        ;;
+    rhel)
+        _self_warn "Sistema RHEL detectado; fluxos ainda abortam de forma controlada"
+        ;;
+    *)
+        _self_warn "Sistema não suportado detectado: ${OS_DISPLAY}"
+        ;;
     esac
 
     if [[ "${RAM_MB:-0}" =~ ^[0-9]+$ && "${CPU_CORES:-0}" =~ ^[0-9]+$ ]]; then
@@ -2466,7 +2607,7 @@ collect_support_bundle() {
         echo
         echo "ATENCAO: este pacote pode conter credenciais, PSKs e dados sensiveis."
         echo "Use apenas para suporte e armazene com permissao restrita."
-    } > "${tmpdir}/README_SUPORTE.txt"
+    } >"${tmpdir}/README_SUPORTE.txt"
 
     {
         echo "== Sistema =="
@@ -2484,7 +2625,7 @@ collect_support_bundle() {
         echo "== Rede =="
         timeout 10 ip addr 2>/dev/null || true
         timeout 10 ip route 2>/dev/null || true
-    } > "${tmpdir}/system.txt"
+    } >"${tmpdir}/system.txt"
 
     {
         echo "== Servicos =="
@@ -2493,7 +2634,7 @@ collect_support_bundle() {
             echo "### ${svc}"
             timeout 10 systemctl status "$svc" --no-pager 2>/dev/null || true
         done
-    } > "${tmpdir}/services.txt"
+    } >"${tmpdir}/services.txt"
 
     {
         echo "== Portas =="
@@ -2501,7 +2642,7 @@ collect_support_bundle() {
         echo
         echo "== Processos relacionados =="
         timeout 10 ps aux 2>/dev/null | awk 'NR==1 || /zabbix|postgres|nginx|php.*fpm/' || true
-    } > "${tmpdir}/ports_processes.txt"
+    } >"${tmpdir}/ports_processes.txt"
 
     {
         echo "== Pacotes relacionados =="
@@ -2510,7 +2651,7 @@ collect_support_bundle() {
         echo "== APT sources relacionadas =="
         timeout 10 ls -la /etc/apt/sources.list.d 2>/dev/null || true
         timeout 10 grep -RHiE 'zabbix|postgresql|timescale|ondrej' /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null || true
-    } > "${tmpdir}/packages_repos.txt"
+    } >"${tmpdir}/packages_repos.txt"
 
     for f in \
         /root/zabbix_install_error.json \
@@ -2523,7 +2664,7 @@ collect_support_bundle() {
         /var/log/zabbix-install/server.log \
         /var/log/zabbix-install/proxy.log; do
         if [[ -f "$f" ]]; then
-            timeout 10 tail -n 500 "$f" > "${files_dir}/$(basename "$f").tail" 2>/dev/null || true
+            timeout 10 tail -n 500 "$f" >"${files_dir}/$(basename "$f").tail" 2>/dev/null || true
         fi
     done
 
@@ -2533,12 +2674,12 @@ collect_support_bundle() {
         /etc/zabbix/zabbix_agent2.conf \
         /etc/zabbix/nginx.conf; do
         if [[ -f "$f" ]]; then
-            timeout 10 sed -n '1,260p' "$f" > "${configs_dir}/$(basename "$f")" 2>/dev/null || true
+            timeout 10 sed -n '1,260p' "$f" >"${configs_dir}/$(basename "$f")" 2>/dev/null || true
         fi
     done
 
     for svc in postgresql zabbix-server zabbix-proxy zabbix-agent2 nginx; do
-        timeout 15 journalctl -u "$svc" --no-pager -n 200 > "${logs_dir}/${svc}.journal.txt" 2>/dev/null || true
+        timeout 15 journalctl -u "$svc" --no-pager -n 200 >"${logs_dir}/${svc}.journal.txt" 2>/dev/null || true
     done
     for f in \
         /var/log/zabbix/zabbix_server.log \
@@ -2548,7 +2689,7 @@ collect_support_bundle() {
         /var/log/nginx/access.log \
         /var/log/postgresql/*.log; do
         [[ -f "$f" ]] || continue
-        timeout 10 tail -n 500 "$f" > "${logs_dir}/$(basename "$f").tail" 2>/dev/null || true
+        timeout 10 tail -n 500 "$f" >"${logs_dir}/$(basename "$f").tail" 2>/dev/null || true
     done
 
     {
@@ -2559,7 +2700,7 @@ collect_support_bundle() {
         printf '  "bundle": "%s",\n' "$bundle"
         printf '  "contains_sensitive_data": true\n'
         echo "}"
-    } > "${tmpdir}/manifest.json"
+    } >"${tmpdir}/manifest.json"
 
     if ! command -v tar >/dev/null 2>&1; then
         echo -e "${VERMELHO}${NEGRITO}ERRO:${RESET} comando tar não encontrado; não foi possível gerar o pacote."
@@ -2590,24 +2731,24 @@ show_dry_run_plan() {
     echo -e "\n${AMARELO}${NEGRITO}Nenhuma alteração será feita neste modo.${RESET}"
     echo -e "\n${CIANO}${NEGRITO}▸ COMPONENTE${RESET}"
     case "$component" in
-        db)
-            echo -e "  Base de Dados"
-            echo -e "  Removeria vestígios de PostgreSQL/TimescaleDB se detectados."
-            echo -e "  Prepararia PGDG, avaliaria TimescaleDB e instalaria PostgreSQL 17/18."
-            echo -e "  Criaria base, utilizador, pg_hba.conf e tuning conforme respostas do operador."
-            ;;
-        server)
-            echo -e "  Servidor"
-            echo -e "  Removeria vestígios de Zabbix Server/Nginx se detectados."
-            echo -e "  Prepararia PGDG/Zabbix, instalaria Server, Frontend, Nginx, PHP-FPM e scripts SQL."
-            echo -e "  Importaria schema quando a BD estivesse vazia e configuraria frontend/serviços."
-            ;;
-        proxy)
-            echo -e "  Proxy"
-            echo -e "  Removeria vestígios de Zabbix Proxy/Agent se detectados."
-            echo -e "  Prepararia repositório Zabbix, instalaria Proxy SQLite3 e Agent 2 se escolhido."
-            echo -e "  Aplicaria modo ativo/passivo, PSK e tuning conforme respostas do operador."
-            ;;
+    db)
+        echo -e "  Base de Dados"
+        echo -e "  Removeria vestígios de PostgreSQL/TimescaleDB se detectados."
+        echo -e "  Prepararia PGDG, avaliaria TimescaleDB e instalaria PostgreSQL 17/18."
+        echo -e "  Criaria base, utilizador, pg_hba.conf e tuning conforme respostas do operador."
+        ;;
+    server)
+        echo -e "  Servidor"
+        echo -e "  Removeria vestígios de Zabbix Server/Nginx se detectados."
+        echo -e "  Prepararia PGDG/Zabbix, instalaria Server, Frontend, Nginx, PHP-FPM e scripts SQL."
+        echo -e "  Importaria schema quando a BD estivesse vazia e configuraria frontend/serviços."
+        ;;
+    proxy)
+        echo -e "  Proxy"
+        echo -e "  Removeria vestígios de Zabbix Proxy/Agent se detectados."
+        echo -e "  Prepararia repositório Zabbix, instalaria Proxy SQLite3 e Agent 2 se escolhido."
+        echo -e "  Aplicaria modo ativo/passivo, PSK e tuning conforme respostas do operador."
+        ;;
     esac
     echo -e "\n${CIANO}${NEGRITO}▸ VALIDAÇÕES QUE O MODO NORMAL FARÁ${RESET}"
     echo -e "  Espaço livre em disco, versão do sistema, repositórios, pacotes, serviços e portas."
@@ -2644,16 +2785,22 @@ conf_value() {
 
 doctor_psql_with_pgpass() {
     local host="$1" port="$2" db="$3" user="$4" pass="$5" query="$6"
-    type -P psql >/dev/null 2>&1 || { echo -e "  ${AMARELO}⚠ psql não encontrado neste host.${RESET}"; return 1; }
+    type -P psql >/dev/null 2>&1 || {
+        echo -e "  ${AMARELO}⚠ psql não encontrado neste host.${RESET}"
+        return 1
+    }
     local pgpass_file pgpass_pass psql_bin
     psql_bin="$(type -P psql 2>/dev/null || true)"
-    [[ -n "$psql_bin" ]] || { echo -e "  ${AMARELO}⚠ binário psql não encontrado neste host.${RESET}"; return 1; }
+    [[ -n "$psql_bin" ]] || {
+        echo -e "  ${AMARELO}⚠ binário psql não encontrado neste host.${RESET}"
+        return 1
+    }
     pgpass_file=$(mktemp)
     # Garante remoção do ficheiro com senha em qualquer saída (normal, ERR, Ctrl+C)
     # shellcheck disable=SC2064
     trap "rm -f '${pgpass_file}'" RETURN
     pgpass_pass=$(pgpass_escape "$pass")
-    echo "${host}:${port}:*:${user}:${pgpass_pass}" > "$pgpass_file"
+    echo "${host}:${port}:*:${user}:${pgpass_pass}" >"$pgpass_file"
     chmod 0600 "$pgpass_file"
     PGPASSFILE="$pgpass_file" PGCONNECT_TIMEOUT=5 timeout 10 "$psql_bin" -h "$host" -p "$port" -U "$user" -d "$db" -tAc "$query" 2>/dev/null
 }
@@ -2665,10 +2812,14 @@ doctor_db_connection_from_server_conf() {
         return 0
     fi
     local host port db user pass schema
-    host=$(conf_value "$conf" "DBHost"); host=${host:-localhost}
-    port=$(conf_value "$conf" "DBPort"); port=${port:-5432}
-    db=$(conf_value "$conf" "DBName"); db=${db:-zabbix}
-    user=$(conf_value "$conf" "DBUser"); user=${user:-zabbix}
+    host=$(conf_value "$conf" "DBHost")
+    host=${host:-localhost}
+    port=$(conf_value "$conf" "DBPort")
+    port=${port:-5432}
+    db=$(conf_value "$conf" "DBName")
+    db=${db:-zabbix}
+    user=$(conf_value "$conf" "DBUser")
+    user=${user:-zabbix}
     pass=$(conf_value "$conf" "DBPassword")
     echo -e "\n${CIANO}${NEGRITO}▸ TESTE REAL DA BASE DE DADOS${RESET}"
     if schema=$(doctor_psql_with_pgpass "$host" "$port" "$db" "$user" "$pass" "SELECT mandatory FROM dbversion LIMIT 1;"); then
@@ -2677,7 +2828,7 @@ doctor_db_connection_from_server_conf() {
         echo -e "  ${VERDE}✔${RESET} Schema Zabbix dbversion: ${schema:-não informado}"
     else
         echo -e "  ${AMARELO}⚠${RESET} Falha ao conectar na BD com ${conf}"
-        [[ "${DOCTOR_ACTIVE:-0}" == "1" ]] && DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
+        [[ "${DOCTOR_ACTIVE:-0}" == "1" ]] && DOCTOR_WARN=$((DOCTOR_WARN + 1))
     fi
 }
 
@@ -2700,10 +2851,10 @@ doctor_scan_common_log_errors() {
         "database is not available"
     )
     case "$component" in
-        db) files=(/var/log/postgresql/*.log) ;;
-        server) files=(/var/log/zabbix/zabbix_server.log /var/log/nginx/error.log) ;;
-        proxy) files=(/var/log/zabbix/zabbix_proxy.log /var/log/zabbix/zabbix_agent2.log) ;;
-        *) files=(/var/log/zabbix/*.log /var/log/postgresql/*.log /var/log/nginx/error.log) ;;
+    db) files=(/var/log/postgresql/*.log) ;;
+    server) files=(/var/log/zabbix/zabbix_server.log /var/log/nginx/error.log) ;;
+    proxy) files=(/var/log/zabbix/zabbix_proxy.log /var/log/zabbix/zabbix_agent2.log) ;;
+    *) files=(/var/log/zabbix/*.log /var/log/postgresql/*.log /var/log/nginx/error.log) ;;
     esac
     echo -e "\n${CIANO}${NEGRITO}▸ ERROS COMUNS NOS LOGS${RESET}"
     local found=0
@@ -2713,7 +2864,7 @@ doctor_scan_common_log_errors() {
             count=$(safe_count_matches "$pattern" "$file")
             if [[ "$count" =~ ^[0-9]+$ && "$count" -gt 0 ]]; then
                 found=1
-                DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
+                DOCTOR_WARN=$((DOCTOR_WARN + 1))
                 printf "  ${AMARELO}⚠${RESET} %-42s %s ocorrência(s) em %s\n" "$pattern" "$count" "$file"
             fi
         done
@@ -2741,128 +2892,128 @@ run_doctor_mode() {
     echo -e "\n${CIANO}${NEGRITO}▸ COMPONENTE: ${component}${RESET}"
     LOG_FILE=""
     case "$component" in
-        db)
-            if postgres_is_ready "${PG_VER:-}" "${PG_CLUSTER_NAME:-main}"; then
-                echo -e "  ${VERDE}✔${RESET} PostgreSQL: pronto/respondendo"
+    db)
+        if postgres_is_ready "${PG_VER:-}" "${PG_CLUSTER_NAME:-main}"; then
+            echo -e "  ${VERDE}✔${RESET} PostgreSQL: pronto/respondendo"
+        else
+            echo -e "  ${AMARELO}⚠${RESET} PostgreSQL: não respondeu ao diagnóstico local"
+            echo -e "  Diagnóstico: journalctl -u postgresql -n 80 --no-pager"
+            print_service_journal_tail "postgresql@${PG_VER:-17}-${PG_CLUSTER_NAME:-main}" 20
+            print_service_journal_tail postgresql 20
+            DOCTOR_WARN=$((DOCTOR_WARN + 1))
+        fi
+        if pkg_is_installed "postgresql" || pkg_is_installed "postgresql-${PG_VER:-17}"; then
+            echo -e "  ${VERDE}✔${RESET} Pacote PostgreSQL instalado"
+        else
+            echo -e "  ${AMARELO}⚠${RESET} Pacote PostgreSQL não identificado pelo gestor de pacotes"
+            DOCTOR_WARN=$((DOCTOR_WARN + 1))
+        fi
+        check_tcp_listen 5432 "PostgreSQL"
+        if [[ -f /etc/zabbix/zabbix_agent2.conf || -f /etc/zabbix/zabbix_agent2.psk ]]; then
+            validate_service_active zabbix-agent2
+            echo -e "\n${CIANO}${NEGRITO}▸ AGENT 2 DA BASE DE DADOS${RESET}"
+            printf "  %-18s %s\n" "Hostname:" "$(conf_value /etc/zabbix/zabbix_agent2.conf Hostname)"
+            printf "  %-18s %s\n" "Server:" "$(conf_value /etc/zabbix/zabbix_agent2.conf Server)"
+            printf "  %-18s %s\n" "ServerActive:" "$(conf_value /etc/zabbix/zabbix_agent2.conf ServerActive)"
+            [[ -f /etc/zabbix/zabbix_agent2.psk ]] &&
+                echo -e "  ${VERDE}✔${RESET} PSK configurado (/etc/zabbix/zabbix_agent2.psk)" ||
+                echo -e "  ${AMARELO}⚠${RESET} PSK não configurado"
+        fi
+        if type -P psql >/dev/null 2>&1; then
+            postgres_psql_timeout 10 -tAc "SELECT version();" 2>/dev/null | sed 's/^/  PostgreSQL: /' || true
+            echo -e "\n${CIANO}${NEGRITO}▸ TIMESCALEDB${RESET}"
+            local tsdb_info tsdb_db
+            # Determina o nome da BD: lê do zabbix_server.conf se existir, senão usa "zabbix"
+            tsdb_db="zabbix"
+            [[ -f /etc/zabbix/zabbix_server.conf ]] &&
+                tsdb_db=$(timeout 10 awk -F'=' '/^DBName[[:space:]]*=/{gsub(/[[:space:]]/,"",$2); print $2}' \
+                    /etc/zabbix/zabbix_server.conf 2>/dev/null | head -1 || true)
+            [[ -z "$tsdb_db" ]] && tsdb_db="zabbix"
+            tsdb_info=$(postgres_psql_timeout 10 -d "$tsdb_db" -tAc \
+                "SELECT extname || ' ' || extversion FROM pg_extension WHERE extname='timescaledb';" \
+                2>/dev/null | xargs || true)
+            if [[ -n "$tsdb_info" ]]; then
+                echo -e "  ${VERDE}✔${RESET} Extensão carregada: ${tsdb_info} (BD: ${tsdb_db})"
             else
-                echo -e "  ${AMARELO}⚠${RESET} PostgreSQL: não respondeu ao diagnóstico local"
-                echo -e "  Diagnóstico: journalctl -u postgresql -n 80 --no-pager"
-                print_service_journal_tail "postgresql@${PG_VER:-17}-${PG_CLUSTER_NAME:-main}" 20
-                print_service_journal_tail postgresql 20
-                DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
+                echo -e "  ${AMARELO}⚠${RESET} Extensão timescaledb não encontrada na BD '${tsdb_db}'"
+                DOCTOR_WARN=$((DOCTOR_WARN + 1))
             fi
-            if pkg_is_installed "postgresql" || pkg_is_installed "postgresql-${PG_VER:-17}"; then
-                echo -e "  ${VERDE}✔${RESET} Pacote PostgreSQL instalado"
-            else
-                echo -e "  ${AMARELO}⚠${RESET} Pacote PostgreSQL não identificado pelo gestor de pacotes"
-                DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
+        else
+            echo -e "  ${AMARELO}⚠ psql não encontrado para diagnóstico local.${RESET}"
+            DOCTOR_WARN=$((DOCTOR_WARN + 1))
+        fi
+        ;;
+    server)
+        validate_service_active zabbix-server
+        validate_service_active nginx
+        local php_svc
+        php_svc=$(safe_diag_cmd systemctl list-units 'php*-fpm.service' --no-legend --no-pager | awk '{print $1}' | head -1 || true)
+        if [[ -n "$php_svc" ]]; then
+            validate_service_active "${php_svc%.service}"
+        else
+            echo -e "  ${AMARELO}⚠ Serviço php-fpm não detectado.${RESET}"
+            DOCTOR_WARN=$((DOCTOR_WARN + 1))
+        fi
+        check_tcp_listen 10051 "Zabbix Server"
+        NGINX_PORT=$(timeout 10 awk '/^[[:space:]]*listen[[:space:]]+[0-9]+/ { for (i=1;i<=NF;i++) if ($i ~ /^[0-9]+/) { gsub(/[^0-9]/,"",$i); print $i; exit } }' /etc/zabbix/nginx.conf 2>/dev/null || true)
+        NGINX_PORT="${NGINX_PORT:-80}"
+        USE_HTTPS=0
+        timeout 10 grep -qE "^[[:space:]]*listen[[:space:]]+${NGINX_PORT}[[:space:]]+ssl" /etc/zabbix/nginx.conf 2>/dev/null && USE_HTTPS=1 || true
+        check_tcp_listen "$NGINX_PORT" "Frontend/Nginx"
+        check_frontend_http
+        doctor_db_connection_from_server_conf
+        printf "  %-34s %s\n" "Versão PHP ativa:" "$(php -v 2>/dev/null | head -1 || echo N/D)"
+        if [[ -f /etc/zabbix/zabbix_agent2.conf ]]; then
+            echo -e "\n${CIANO}${NEGRITO}▸ AGENT 2 DO SERVIDOR${RESET}"
+            validate_service_active zabbix-agent2
+            printf "  %-18s %s\n" "Hostname:" "$(conf_value /etc/zabbix/zabbix_agent2.conf Hostname)"
+            printf "  %-18s %s\n" "Server:" "$(conf_value /etc/zabbix/zabbix_agent2.conf Server)"
+            printf "  %-18s %s\n" "ServerActive:" "$(conf_value /etc/zabbix/zabbix_agent2.conf ServerActive)"
+            [[ -f /etc/zabbix/zabbix_agent2.psk ]] &&
+                echo -e "  ${VERDE}✔${RESET} PSK configurado (/etc/zabbix/zabbix_agent2.psk)" ||
+                echo -e "  ${AMARELO}⚠${RESET} PSK não configurado"
+        fi
+        ;;
+    proxy)
+        validate_service_active zabbix-proxy
+        check_tcp_listen 10051 "Zabbix Proxy"
+        [[ -f /etc/zabbix/zabbix_proxy.conf ]] && {
+            echo -e "\n${CIANO}${NEGRITO}▸ PROXY CONFIG${RESET}"
+            printf "  %-18s %s\n" "Server:" "$(conf_value /etc/zabbix/zabbix_proxy.conf Server)"
+            printf "  %-18s %s\n" "Hostname:" "$(conf_value /etc/zabbix/zabbix_proxy.conf Hostname)"
+            printf "  %-18s %s\n" "ProxyMode:" "$(conf_value /etc/zabbix/zabbix_proxy.conf ProxyMode)"
+            check_proxy_server_connectivity "$(conf_value /etc/zabbix/zabbix_proxy.conf Server)" "$(conf_value /etc/zabbix/zabbix_proxy.conf ProxyMode)"
+        }
+        if [[ -f /etc/zabbix/zabbix_agent2.conf ]]; then
+            local proxy_mode agent_server agent_server_active
+            proxy_mode="$(conf_value /etc/zabbix/zabbix_proxy.conf ProxyMode)"
+            agent_server="$(conf_value /etc/zabbix/zabbix_agent2.conf Server)"
+            agent_server_active="$(conf_value /etc/zabbix/zabbix_agent2.conf ServerActive)"
+            echo -e "\n${CIANO}${NEGRITO}▸ AGENT 2 DO PROXY${RESET}"
+            validate_service_active zabbix-agent2
+            printf "  %-18s %s\n" "Hostname:" "$(conf_value /etc/zabbix/zabbix_agent2.conf Hostname)"
+            printf "  %-18s %s\n" "Server:" "$agent_server"
+            printf "  %-18s %s\n" "ServerActive:" "$agent_server_active"
+            if [[ "$proxy_mode" == "0" ]]; then
+                validate_proxy_server_value "$agent_server" "$proxy_mode" "Server do Agent 2" >/dev/null 2>&1 || {
+                    echo -e "  ${AMARELO}⚠${RESET} Server do Agent 2 aponta para destino local/inválido em Proxy ativo."
+                    DOCTOR_WARN=$((DOCTOR_WARN + 1))
+                }
+                validate_proxy_server_value "$agent_server_active" "$proxy_mode" "ServerActive do Agent 2" >/dev/null 2>&1 || {
+                    echo -e "  ${AMARELO}⚠${RESET} ServerActive do Agent 2 aponta para destino local/inválido em Proxy ativo."
+                    DOCTOR_WARN=$((DOCTOR_WARN + 1))
+                }
             fi
-            check_tcp_listen 5432 "PostgreSQL"
-            if [[ -f /etc/zabbix/zabbix_agent2.conf || -f /etc/zabbix/zabbix_agent2.psk ]]; then
-                validate_service_active zabbix-agent2
-                echo -e "\n${CIANO}${NEGRITO}▸ AGENT 2 DA BASE DE DADOS${RESET}"
-                printf "  %-18s %s\n" "Hostname:" "$(conf_value /etc/zabbix/zabbix_agent2.conf Hostname)"
-                printf "  %-18s %s\n" "Server:" "$(conf_value /etc/zabbix/zabbix_agent2.conf Server)"
-                printf "  %-18s %s\n" "ServerActive:" "$(conf_value /etc/zabbix/zabbix_agent2.conf ServerActive)"
-                [[ -f /etc/zabbix/zabbix_agent2.psk ]] && \
-                    echo -e "  ${VERDE}✔${RESET} PSK configurado (/etc/zabbix/zabbix_agent2.psk)" || \
-                    echo -e "  ${AMARELO}⚠${RESET} PSK não configurado"
-            fi
-            if type -P psql >/dev/null 2>&1; then
-                postgres_psql_timeout 10 -tAc "SELECT version();" 2>/dev/null | sed 's/^/  PostgreSQL: /' || true
-                echo -e "\n${CIANO}${NEGRITO}▸ TIMESCALEDB${RESET}"
-                local tsdb_info tsdb_db
-                # Determina o nome da BD: lê do zabbix_server.conf se existir, senão usa "zabbix"
-                tsdb_db="zabbix"
-                [[ -f /etc/zabbix/zabbix_server.conf ]] && \
-                    tsdb_db=$(timeout 10 awk -F'=' '/^DBName[[:space:]]*=/{gsub(/[[:space:]]/,"",$2); print $2}' \
-                        /etc/zabbix/zabbix_server.conf 2>/dev/null | head -1 || true)
-                [[ -z "$tsdb_db" ]] && tsdb_db="zabbix"
-                tsdb_info=$(postgres_psql_timeout 10 -d "$tsdb_db" -tAc \
-                    "SELECT extname || ' ' || extversion FROM pg_extension WHERE extname='timescaledb';" \
-                    2>/dev/null | xargs || true)
-                if [[ -n "$tsdb_info" ]]; then
-                    echo -e "  ${VERDE}✔${RESET} Extensão carregada: ${tsdb_info} (BD: ${tsdb_db})"
-                else
-                    echo -e "  ${AMARELO}⚠${RESET} Extensão timescaledb não encontrada na BD '${tsdb_db}'"
-                    DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
-                fi
-            else
-                echo -e "  ${AMARELO}⚠ psql não encontrado para diagnóstico local.${RESET}"
-                DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
-            fi
-            ;;
-        server)
-            validate_service_active zabbix-server
-            validate_service_active nginx
-            local php_svc
-            php_svc=$(safe_diag_cmd systemctl list-units 'php*-fpm.service' --no-legend --no-pager | awk '{print $1}' | head -1 || true)
-            if [[ -n "$php_svc" ]]; then
-                validate_service_active "${php_svc%.service}"
-            else
-                echo -e "  ${AMARELO}⚠ Serviço php-fpm não detectado.${RESET}"
-                DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
-            fi
-            check_tcp_listen 10051 "Zabbix Server"
-            NGINX_PORT=$(timeout 10 awk '/^[[:space:]]*listen[[:space:]]+[0-9]+/ { for (i=1;i<=NF;i++) if ($i ~ /^[0-9]+/) { gsub(/[^0-9]/,"",$i); print $i; exit } }' /etc/zabbix/nginx.conf 2>/dev/null || true)
-            NGINX_PORT="${NGINX_PORT:-80}"
-            USE_HTTPS=0
-            timeout 10 grep -qE "^[[:space:]]*listen[[:space:]]+${NGINX_PORT}[[:space:]]+ssl" /etc/zabbix/nginx.conf 2>/dev/null && USE_HTTPS=1 || true
-            check_tcp_listen "$NGINX_PORT" "Frontend/Nginx"
-            check_frontend_http
-            doctor_db_connection_from_server_conf
-            printf "  %-34s %s\n" "Versão PHP ativa:" "$(php -v 2>/dev/null | head -1 || echo N/D)"
-            if [[ -f /etc/zabbix/zabbix_agent2.conf ]]; then
-                echo -e "\n${CIANO}${NEGRITO}▸ AGENT 2 DO SERVIDOR${RESET}"
-                validate_service_active zabbix-agent2
-                printf "  %-18s %s\n" "Hostname:" "$(conf_value /etc/zabbix/zabbix_agent2.conf Hostname)"
-                printf "  %-18s %s\n" "Server:" "$(conf_value /etc/zabbix/zabbix_agent2.conf Server)"
-                printf "  %-18s %s\n" "ServerActive:" "$(conf_value /etc/zabbix/zabbix_agent2.conf ServerActive)"
-                [[ -f /etc/zabbix/zabbix_agent2.psk ]] && \
-                    echo -e "  ${VERDE}✔${RESET} PSK configurado (/etc/zabbix/zabbix_agent2.psk)" || \
-                    echo -e "  ${AMARELO}⚠${RESET} PSK não configurado"
-            fi
-            ;;
-        proxy)
-            validate_service_active zabbix-proxy
-            check_tcp_listen 10051 "Zabbix Proxy"
-            [[ -f /etc/zabbix/zabbix_proxy.conf ]] && {
-                echo -e "\n${CIANO}${NEGRITO}▸ PROXY CONFIG${RESET}"
-                printf "  %-18s %s\n" "Server:" "$(conf_value /etc/zabbix/zabbix_proxy.conf Server)"
-                printf "  %-18s %s\n" "Hostname:" "$(conf_value /etc/zabbix/zabbix_proxy.conf Hostname)"
-                printf "  %-18s %s\n" "ProxyMode:" "$(conf_value /etc/zabbix/zabbix_proxy.conf ProxyMode)"
-                check_proxy_server_connectivity "$(conf_value /etc/zabbix/zabbix_proxy.conf Server)" "$(conf_value /etc/zabbix/zabbix_proxy.conf ProxyMode)"
-            }
-            if [[ -f /etc/zabbix/zabbix_agent2.conf ]]; then
-                local proxy_mode agent_server agent_server_active
-                proxy_mode="$(conf_value /etc/zabbix/zabbix_proxy.conf ProxyMode)"
-                agent_server="$(conf_value /etc/zabbix/zabbix_agent2.conf Server)"
-                agent_server_active="$(conf_value /etc/zabbix/zabbix_agent2.conf ServerActive)"
-                echo -e "\n${CIANO}${NEGRITO}▸ AGENT 2 DO PROXY${RESET}"
-                validate_service_active zabbix-agent2
-                printf "  %-18s %s\n" "Hostname:" "$(conf_value /etc/zabbix/zabbix_agent2.conf Hostname)"
-                printf "  %-18s %s\n" "Server:" "$agent_server"
-                printf "  %-18s %s\n" "ServerActive:" "$agent_server_active"
-                if [[ "$proxy_mode" == "0" ]]; then
-                    validate_proxy_server_value "$agent_server" "$proxy_mode" "Server do Agent 2" >/dev/null 2>&1 || {
-                        echo -e "  ${AMARELO}⚠${RESET} Server do Agent 2 aponta para destino local/inválido em Proxy ativo."
-                        DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
-                    }
-                    validate_proxy_server_value "$agent_server_active" "$proxy_mode" "ServerActive do Agent 2" >/dev/null 2>&1 || {
-                        echo -e "  ${AMARELO}⚠${RESET} ServerActive do Agent 2 aponta para destino local/inválido em Proxy ativo."
-                        DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
-                    }
-                fi
-                [[ -f /etc/zabbix/zabbix_agent2.psk ]] && \
-                    echo -e "  ${VERDE}✔${RESET} PSK configurado (/etc/zabbix/zabbix_agent2.psk)" || \
-                    echo -e "  ${AMARELO}⚠${RESET} PSK não configurado"
-            fi
-            ;;
+            [[ -f /etc/zabbix/zabbix_agent2.psk ]] &&
+                echo -e "  ${VERDE}✔${RESET} PSK configurado (/etc/zabbix/zabbix_agent2.psk)" ||
+                echo -e "  ${AMARELO}⚠${RESET} PSK não configurado"
+        fi
+        ;;
     esac
     doctor_scan_common_log_errors "$component"
     echo -e "\n${CIANO}${NEGRITO}▸ RESULTADO DO DOCTOR${RESET}"
     if [[ "$DOCTOR_FAIL" -gt 0 ]]; then
-        DOCTOR_WARN=$(( DOCTOR_WARN + DOCTOR_FAIL ))
+        DOCTOR_WARN=$((DOCTOR_WARN + DOCTOR_FAIL))
         printf "  ${AMARELO}${NEGRITO}%-18s${RESET} %s aviso(s)\n" "COM AVISOS" "$DOCTOR_WARN"
     elif [[ "$DOCTOR_WARN" -gt 0 ]]; then
         printf "  ${AMARELO}${NEGRITO}%-18s${RESET} %s aviso(s)\n" "COM AVISOS" "$DOCTOR_WARN"
@@ -2873,22 +3024,42 @@ run_doctor_mode() {
     echo -e "\n${VERDE}${NEGRITO}Doctor concluído. Nenhuma alteração foi feita.${RESET}\n"
 }
 
-[[ "$LIST_VERSIONS" == "1" ]] && { show_supported_versions; exit 0; }
-[[ "$LIST_SUPPORTED_OS" == "1" ]] && { show_supported_os; exit 0; }
-[[ "$SELF_TEST_MODE" == "1" ]] && { run_self_test; exit 0; }
+[[ "$LIST_VERSIONS" == "1" ]] && {
+    show_supported_versions
+    exit 0
+}
+[[ "$LIST_SUPPORTED_OS" == "1" ]] && {
+    show_supported_os
+    exit 0
+}
+[[ "$SELF_TEST_MODE" == "1" ]] && {
+    run_self_test
+    exit 0
+}
 validate_supported_ubuntu_any_component
-[[ "$COLLECT_SUPPORT_BUNDLE" == "1" ]] && { collect_support_bundle; exit 0; }
-[[ "$DEBUG_SERVICES" == "1" ]] && { run_debug_services; exit 0; }
-[[ "$WIPE_MODE" == "1" ]] && { run_wipe_mode; exit 0; }
-[[ "$CHECK_ONLY" == "1" ]] && { run_check_mode; exit 0; }
-
+[[ "$COLLECT_SUPPORT_BUNDLE" == "1" ]] && {
+    collect_support_bundle
+    exit 0
+}
+[[ "$DEBUG_SERVICES" == "1" ]] && {
+    run_debug_services
+    exit 0
+}
+[[ "$WIPE_MODE" == "1" ]] && {
+    run_wipe_mode
+    exit 0
+}
+[[ "$CHECK_ONLY" == "1" ]] && {
+    run_check_mode
+    exit 0
+}
 
 # ------------------------------------------------------------------------------
 # 4. BANNER + SELEÇÃO DE COMPONENTE
 # ------------------------------------------------------------------------------
 clear
 echo -e "${VERMELHO}${NEGRITO}"
-cat << "EOF"
+cat <<"EOF"
 ███████╗ █████╗ ██████╗ ██████╗ ██╗██╗  ██╗
 ╚══███╔╝██╔══██╗██╔══██╗██╔══██╗██║╚██╗██╔╝
   ███╔╝ ███████║██████╔╝██████╔╝██║ ╚███╔╝
@@ -2916,11 +3087,23 @@ else
     while true; do
         read -rp "  Escolha (1, 2, 3 ou 4): " COMP_OPT
         case "$COMP_OPT" in
-            1) COMPONENT="db";     break ;;
-            2) COMPONENT="server"; break ;;
-            3) COMPONENT="proxy";  break ;;
-            4) echo -e "\n${AMARELO}Saindo sem executar alterações.${RESET}"; exit 0 ;;
-            *) echo -e "  ${VERMELHO}Opção inválida.${RESET}" ;;
+        1)
+            COMPONENT="db"
+            break
+            ;;
+        2)
+            COMPONENT="server"
+            break
+            ;;
+        3)
+            COMPONENT="proxy"
+            break
+            ;;
+        4)
+            echo -e "\n${AMARELO}Saindo sem executar alterações.${RESET}"
+            exit 0
+            ;;
+        *) echo -e "  ${VERMELHO}Opção inválida.${RESET}" ;;
         esac
     done
 fi
@@ -2939,7 +3122,7 @@ fi
 if [[ "$SIMULATE_MODE" == "1" ]]; then
     echo -e "  ${AMARELO}${NEGRITO}MODO SIMULAÇÃO:${RESET} o questionário será mantido, mas o pipeline não executará ações reais."
 else
-acquire_install_lock
+    acquire_install_lock
 fi
 
 # ==============================================================================
@@ -2975,46 +3158,77 @@ db)
         elif grep -qE "^#[[:space:]]*${param}[[:space:]]*=" "$file"; then
             sed -i "0,/^#[[:space:]]*${param}[[:space:]]*=/{s|^#[[:space:]]*${param}[[:space:]]*=.*|${param} = ${escaped_value}|}" "$file"
         else
-            echo "${param} = ${value}" >> "$file"
+            echo "${param} = ${value}" >>"$file"
         fi
     }
 
     calc_pg_auto_tuning() {
         local ram=$RAM_MB
-        if   (( ram >= 16384 )); then PG_MAX_CONN="500"
-        elif (( ram >=  8192 )); then PG_MAX_CONN="300"
-        elif (( ram >=  4096 )); then PG_MAX_CONN="200"
-        else                          PG_MAX_CONN="100"
+        if ((ram >= 16384)); then
+            PG_MAX_CONN="500"
+        elif ((ram >= 8192)); then
+            PG_MAX_CONN="300"
+        elif ((ram >= 4096)); then
+            PG_MAX_CONN="200"
+        else
+            PG_MAX_CONN="100"
         fi
-        local sb=$(( ram * 25 / 100 ))
-        (( sb <  128 )) && sb=128; (( sb > 8192 )) && sb=8192
+        local sb=$((ram * 25 / 100))
+        ((sb < 128)) && sb=128
+        ((sb > 8192)) && sb=8192
         PG_SHARED_BUF="${sb}MB"
-        local wm=$(( ram * 25 / 100 / PG_MAX_CONN ))
-        (( wm <  4 )) && wm=4; (( wm > 64 )) && wm=64
+        local wm=$((ram * 25 / 100 / PG_MAX_CONN))
+        ((wm < 4)) && wm=4
+        ((wm > 64)) && wm=64
         PG_WORK_MEM="${wm}MB"
-        local mm=$(( ram / 8 ))
-        (( mm <   64 )) && mm=64; (( mm > 2048 )) && mm=2048
+        local mm=$((ram / 8))
+        ((mm < 64)) && mm=64
+        ((mm > 2048)) && mm=2048
         PG_MAINT_MEM="${mm}MB"
-        local ec=$(( ram * 75 / 100 ))
-        (( ec < 256 )) && ec=256
+        local ec=$((ram * 75 / 100))
+        ((ec < 256)) && ec=256
         PG_EFF_CACHE="${ec}MB"
-        local wb=$(( sb * 3 / 100 ))
-        (( wb <  8 )) && wb=8; (( wb > 64 )) && wb=64
+        local wb=$((sb * 3 / 100))
+        ((wb < 8)) && wb=8
+        ((wb > 64)) && wb=64
         PG_WAL_BUFS="${wb}MB"
-        PG_CKPT="0.9"; PG_STATS="100"; PG_RAND_COST="1.1"
+        PG_CKPT="0.9"
+        PG_STATS="100"
+        PG_RAND_COST="1.1"
     }
 
     # Variáveis de estado
-    PG_VER="17"; USE_TSDB_TUNE="1"; ZBX_TARGET_VERSION="7.4"; ZBX_AGENT_VERSION="7.4"
+    PG_VER="17"
+    USE_TSDB_TUNE="1"
+    ZBX_TARGET_VERSION="7.4"
+    ZBX_AGENT_VERSION="7.4"
     ZBX_SERVER_IPS=()
-    DB_NAME="zabbix"; DB_USER="zabbix"; DB_PASS=""
-    UPDATE_SYSTEM="0"; CLEAN_INSTALL=0; USE_TUNING="0"
-    INSTALL_AGENT="0"; USE_PSK="0"; AG_SERVER=""; AG_SERVER_ACTIVE=""
-    AG_HOSTNAME=""; AG_ALLOWKEY="0"; PSK_AGENT_ID=""; PSK_AGENT_KEY=""
-    PG_MAX_CONN="200"; PG_SHARED_BUF="256MB"; PG_WORK_MEM="8MB"
-    PG_MAINT_MEM="128MB"; PG_EFF_CACHE="768MB"; PG_WAL_BUFS="16MB"
-    PG_CKPT="0.9"; PG_STATS="100"; PG_RAND_COST="1.1"
-    PG_CLUSTER_NAME="main"; PG_CONF_FILE=""; PG_HBA_FILE=""
+    DB_NAME="zabbix"
+    DB_USER="zabbix"
+    DB_PASS=""
+    UPDATE_SYSTEM="0"
+    CLEAN_INSTALL=0
+    USE_TUNING="0"
+    INSTALL_AGENT="0"
+    USE_PSK="0"
+    AG_SERVER=""
+    AG_SERVER_ACTIVE=""
+    AG_HOSTNAME=""
+    AG_ALLOWKEY="0"
+    PSK_AGENT_ID=""
+    PSK_AGENT_KEY=""
+    PG_MAX_CONN="200"
+    PG_SHARED_BUF="256MB"
+    PG_WORK_MEM="8MB"
+    PG_MAINT_MEM="128MB"
+    PG_EFF_CACHE="768MB"
+    PG_WAL_BUFS="16MB"
+    PG_CKPT="0.9"
+    PG_STATS="100"
+    PG_RAND_COST="1.1"
+    PG_CLUSTER_NAME="main"
+    PG_CONF_FILE=""
+    PG_HBA_FILE=""
     DB_TIMEZONE="${SYS_TIMEZONE:-America/Sao_Paulo}"
 
     # Detectar IP local primário para listen_addresses (apenas a interface de saída)
@@ -3027,13 +3241,13 @@ db)
     if [[ -n "$PG_LOCAL_IP" ]]; then
         PG_LISTEN_ADDR="'localhost,${PG_LOCAL_IP}'"
     else
-        PG_LISTEN_ADDR="'*'"   # fallback se deteção falhar
+        PG_LISTEN_ADDR="'*'" # fallback se deteção falhar
     fi
 
     # Banner BD
     clear
     echo -e "${VERMELHO}${NEGRITO}"
-    cat << "EOF"
+    cat <<"EOF"
 ██████╗  █████╗ ████████╗ █████╗ ██████╗  █████╗ ███████╗███████╗
 ██╔══██╗██╔══██╗╚══██╔══╝██╔══██╗██╔══██╗██╔══██╗██╔════╝██╔════╝
 ██║  ██║███████║   ██║   ███████║██████╔╝███████║███████╗█████╗
@@ -3074,9 +3288,15 @@ EOF
         while true; do
             read -rp "   Escolha (1 ou 2): " zbx_target_opt
             case "$zbx_target_opt" in
-                1) ZBX_TARGET_VERSION="7.0"; break ;;
-                2) ZBX_TARGET_VERSION="7.4"; break ;;
-                *) echo -e "   ${VERMELHO}Opção inválida.${RESET}" ;;
+            1)
+                ZBX_TARGET_VERSION="7.0"
+                break
+                ;;
+            2)
+                ZBX_TARGET_VERSION="7.4"
+                break
+                ;;
+            *) echo -e "   ${VERMELHO}Opção inválida.${RESET}" ;;
             esac
         done
         ZBX_AGENT_VERSION="$ZBX_TARGET_VERSION"
@@ -3097,11 +3317,16 @@ EOF
         while true; do
             read -rp "   Escolha (1 ou 2): " pg_opt
             case "$pg_opt" in
-                1) PG_VER="17"; break ;;
-                2) PG_VER="18"
-                   echo -e "\n   ${AMARELO}${NEGRITO}⚠  ATENÇÃO: PostgreSQL 18 + TimescaleDB pode ser experimental.${RESET}"
-                   break ;;
-                *) echo -e "   ${VERMELHO}Opção inválida.${RESET}" ;;
+            1)
+                PG_VER="17"
+                break
+                ;;
+            2)
+                PG_VER="18"
+                echo -e "\n   ${AMARELO}${NEGRITO}⚠  ATENÇÃO: PostgreSQL 18 + TimescaleDB pode ser experimental.${RESET}"
+                break
+                ;;
+            *) echo -e "   ${VERMELHO}Opção inválida.${RESET}" ;;
             esac
         done
     }
@@ -3128,7 +3353,7 @@ EOF
             done
             validate_ipv4_cidr "$entry" "IP/CIDR do Zabbix Server"
             ZBX_SERVER_IPS+=("$entry")
-            idx=$(( idx + 1 ))
+            idx=$((idx + 1))
             local mais
             ask_yes_no "Adicionar mais um IP/CIDR ao pg_hba.conf?" mais
             [[ "$mais" == "0" ]] && break
@@ -3142,7 +3367,8 @@ EOF
     m_dbcreds() {
         echo -e "\n${CIANO}${NEGRITO}>>> CREDENCIAIS DA BASE DE DADOS <<<${RESET}"
         echo -e "\n${AMARELO}Nome da Base de Dados${RESET} (Padrão Zabbix: zabbix)"
-        read -rp "   Valor Recomendado [zabbix]: " DB_NAME; DB_NAME=${DB_NAME:-zabbix}
+        read -rp "   Valor Recomendado [zabbix]: " DB_NAME
+        DB_NAME=${DB_NAME:-zabbix}
         validate_identifier "$DB_NAME" "Nome da base de dados"
         echo -e "\n${AMARELO}Utilizador da Base de Dados${RESET}"
         echo -e "   1) Gerar utilizador aleatório ${CIANO}(ex: zbx_f3a2b1c9)${RESET} — mais seguro"
@@ -3151,16 +3377,25 @@ EOF
         while true; do
             read -rp "   Escolha (1, 2 ou 3): " u_opt
             case "$u_opt" in
-                1) DB_USER="zbx_$(openssl rand -hex 4)"
-                   echo -e "   ${VERDE}Utilizador gerado: ${NEGRITO}${DB_USER}${RESET}"; break ;;
-                2) DB_USER="zabbix"
-                   echo -e "   ${VERDE}Utilizador: ${NEGRITO}${DB_USER}${RESET}"; break ;;
-                3) while true; do
-                       read -rp "   Nome do utilizador: " DB_USER
-                       [[ -n "$DB_USER" ]] && break
-                       echo -e "   ${VERMELHO}Campo obrigatório.${RESET}"
-                   done; break ;;
-                *) echo -e "   ${VERMELHO}Opção inválida.${RESET}" ;;
+            1)
+                DB_USER="zbx_$(openssl rand -hex 4)"
+                echo -e "   ${VERDE}Utilizador gerado: ${NEGRITO}${DB_USER}${RESET}"
+                break
+                ;;
+            2)
+                DB_USER="zabbix"
+                echo -e "   ${VERDE}Utilizador: ${NEGRITO}${DB_USER}${RESET}"
+                break
+                ;;
+            3)
+                while true; do
+                    read -rp "   Nome do utilizador: " DB_USER
+                    [[ -n "$DB_USER" ]] && break
+                    echo -e "   ${VERMELHO}Campo obrigatório.${RESET}"
+                done
+                break
+                ;;
+            *) echo -e "   ${VERMELHO}Opção inválida.${RESET}" ;;
             esac
         done
         echo -e "\n${AMARELO}Senha do Utilizador${RESET}"
@@ -3171,7 +3406,8 @@ EOF
         ask_yes_no "Redefinir a senha manualmente?" redef
         if [[ "$redef" == "1" ]]; then
             while true; do
-                read -rsp "   Nova senha: " DB_PASS; echo
+                read -rsp "   Nova senha: " DB_PASS
+                echo
                 [[ -n "$DB_PASS" ]] && break
                 echo -e "   ${VERMELHO}Campo obrigatório.${RESET}"
             done
@@ -3189,10 +3425,12 @@ EOF
             echo -e "\n${CIANO}O Agent 2 usará o repositório Zabbix ${ZBX_AGENT_VERSION}, conforme a versão alvo escolhida.${RESET}"
             local default_server="${ZBX_SERVER_IPS[0]:-127.0.0.1}"
             echo -e "\n${AMARELO}Server${RESET} (escuta passiva autorizada)"
-            read -rp "   Valor recomendado [${default_server}]: " AG_SERVER; AG_SERVER=${AG_SERVER:-$default_server}
+            read -rp "   Valor recomendado [${default_server}]: " AG_SERVER
+            AG_SERVER=${AG_SERVER:-$default_server}
             validate_zabbix_identity "$AG_SERVER" "Server do Agente"
             echo -e "\n${AMARELO}ServerActive${RESET} (envio ativo para o Server)"
-            read -rp "   Valor recomendado [${default_server}]: " AG_SERVER_ACTIVE; AG_SERVER_ACTIVE=${AG_SERVER_ACTIVE:-$default_server}
+            read -rp "   Valor recomendado [${default_server}]: " AG_SERVER_ACTIVE
+            AG_SERVER_ACTIVE=${AG_SERVER_ACTIVE:-$default_server}
             validate_zabbix_identity "$AG_SERVER_ACTIVE" "ServerActive do Agente"
             echo -e "\n${AMARELO}Hostname do Agente${RESET} (nome que será cadastrado no frontend)"
             while true; do
@@ -3215,7 +3453,9 @@ EOF
                 validate_zabbix_identity "$PSK_AGENT_ID" "PSK Identity do Agente"
             fi
         else
-            USE_PSK="0"; AG_ALLOWKEY="0"; PSK_AGENT_ID=""
+            USE_PSK="0"
+            AG_ALLOWKEY="0"
+            PSK_AGENT_ID=""
         fi
     }
 
@@ -3250,7 +3490,8 @@ EOF
         read -rp "  max_connections [${PG_MAX_CONN}]: " _v
         PG_MAX_CONN=${_v:-$PG_MAX_CONN}
         if [[ ! "$PG_MAX_CONN" =~ ^[0-9]+$ || "$PG_MAX_CONN" -lt 10 ]]; then
-            echo -e "${VERMELHO}ERRO:${RESET} max_connections inválido: ${PG_MAX_CONN}"; exit 1
+            echo -e "${VERMELHO}ERRO:${RESET} max_connections inválido: ${PG_MAX_CONN}"
+            exit 1
         fi
     }
 
@@ -3261,14 +3502,14 @@ EOF
             echo -e "\n${CIANO}${NEGRITO}>>> ASSISTENTE DE TUNING DO POSTGRESQL <<<${RESET}"
             echo -e "  ${NEGRITO}Hardware detetado: ${RAM_MB} MB RAM | ${CPU_CORES} núcleos${RESET}"
             echo -e "  Valores calculados automaticamente para este hardware:\n"
-            printf "    %-34s ${VERDE}%s${RESET}\n" "shared_buffers (25% RAM):"      "$PG_SHARED_BUF"
-            printf "    %-34s ${VERDE}%s${RESET}\n" "work_mem:"                      "$PG_WORK_MEM"
-            printf "    %-34s ${VERDE}%s${RESET}\n" "maintenance_work_mem (12.5%):"  "$PG_MAINT_MEM"
-            printf "    %-34s ${VERDE}%s${RESET}\n" "effective_cache_size (75%):"    "$PG_EFF_CACHE"
-            printf "    %-34s ${VERDE}%s${RESET}\n" "wal_buffers:"                   "$PG_WAL_BUFS"
-            printf "    %-34s ${VERDE}%s${RESET}\n" "checkpoint_completion_target:"  "$PG_CKPT"
-            printf "    %-34s ${VERDE}%s${RESET}\n" "default_statistics_target:"     "$PG_STATS"
-            printf "    %-34s ${VERDE}%s${RESET}\n" "random_page_cost (SSD):"        "$PG_RAND_COST"
+            printf "    %-34s ${VERDE}%s${RESET}\n" "shared_buffers (25% RAM):" "$PG_SHARED_BUF"
+            printf "    %-34s ${VERDE}%s${RESET}\n" "work_mem:" "$PG_WORK_MEM"
+            printf "    %-34s ${VERDE}%s${RESET}\n" "maintenance_work_mem (12.5%):" "$PG_MAINT_MEM"
+            printf "    %-34s ${VERDE}%s${RESET}\n" "effective_cache_size (75%):" "$PG_EFF_CACHE"
+            printf "    %-34s ${VERDE}%s${RESET}\n" "wal_buffers:" "$PG_WAL_BUFS"
+            printf "    %-34s ${VERDE}%s${RESET}\n" "checkpoint_completion_target:" "$PG_CKPT"
+            printf "    %-34s ${VERDE}%s${RESET}\n" "default_statistics_target:" "$PG_STATS"
+            printf "    %-34s ${VERDE}%s${RESET}\n" "random_page_cost (SSD):" "$PG_RAND_COST"
             echo ""
             local use_auto
             ask_yes_no "Usar estes valores calculados automaticamente?" use_auto
@@ -3277,35 +3518,43 @@ EOF
 
                 echo -e "${AMARELO}1. shared_buffers${RESET} (25% da RAM | Padrão PG: 128MB)"
                 echo -e "   Cache de dados em memória. Regra geral: 25% da RAM total."
-                read -rp "   Valor calculado [${PG_SHARED_BUF}]: " _v; PG_SHARED_BUF=${_v:-$PG_SHARED_BUF}
+                read -rp "   Valor calculado [${PG_SHARED_BUF}]: " _v
+                PG_SHARED_BUF=${_v:-$PG_SHARED_BUF}
 
                 echo -e "\n${AMARELO}3. work_mem${RESET} (Padrão PG: 4MB)"
                 echo -e "   Memória por operação de ordenação/hash. Multiplica por conexões ativas."
-                read -rp "   Valor calculado [${PG_WORK_MEM}]: " _v; PG_WORK_MEM=${_v:-$PG_WORK_MEM}
+                read -rp "   Valor calculado [${PG_WORK_MEM}]: " _v
+                PG_WORK_MEM=${_v:-$PG_WORK_MEM}
 
                 echo -e "\n${AMARELO}4. maintenance_work_mem${RESET} (12.5% da RAM | Padrão PG: 64MB)"
                 echo -e "   Memória para VACUUM, CREATE INDEX, etc."
-                read -rp "   Valor calculado [${PG_MAINT_MEM}]: " _v; PG_MAINT_MEM=${_v:-$PG_MAINT_MEM}
+                read -rp "   Valor calculado [${PG_MAINT_MEM}]: " _v
+                PG_MAINT_MEM=${_v:-$PG_MAINT_MEM}
 
                 echo -e "\n${AMARELO}5. effective_cache_size${RESET} (75% da RAM | Padrão PG: 4GB)"
                 echo -e "   Estimativa do cache disponível ao PostgreSQL (SO + PG). Ajuda o planeador."
-                read -rp "   Valor calculado [${PG_EFF_CACHE}]: " _v; PG_EFF_CACHE=${_v:-$PG_EFF_CACHE}
+                read -rp "   Valor calculado [${PG_EFF_CACHE}]: " _v
+                PG_EFF_CACHE=${_v:-$PG_EFF_CACHE}
 
                 echo -e "\n${AMARELO}6. wal_buffers${RESET} (3% de shared_buffers | Padrão PG: auto)"
                 echo -e "   Buffer de memória para o Write-Ahead Log. Melhora escrita em disco."
-                read -rp "   Valor calculado [${PG_WAL_BUFS}]: " _v; PG_WAL_BUFS=${_v:-$PG_WAL_BUFS}
+                read -rp "   Valor calculado [${PG_WAL_BUFS}]: " _v
+                PG_WAL_BUFS=${_v:-$PG_WAL_BUFS}
 
                 echo -e "\n${AMARELO}7. checkpoint_completion_target${RESET} (Padrão PG: 0.9)"
                 echo -e "   Fracção do intervalo de checkpoint para distribuir a escrita. 0.9 é ideal."
-                read -rp "   Valor calculado [${PG_CKPT}]: " _v; PG_CKPT=${_v:-$PG_CKPT}
+                read -rp "   Valor calculado [${PG_CKPT}]: " _v
+                PG_CKPT=${_v:-$PG_CKPT}
 
                 echo -e "\n${AMARELO}8. default_statistics_target${RESET} (Padrão PG: 100)"
                 echo -e "   Detalhe das estatísticas do planeador. Mais alto = queries mais eficientes."
-                read -rp "   Valor calculado [${PG_STATS}]: " _v; PG_STATS=${_v:-$PG_STATS}
+                read -rp "   Valor calculado [${PG_STATS}]: " _v
+                PG_STATS=${_v:-$PG_STATS}
 
                 echo -e "\n${AMARELO}9. random_page_cost${RESET} (SSD: 1.1 | HDD: 4.0 | Padrão PG: 4.0)"
                 echo -e "   Custo estimado de acesso aleatório. Use 1.1 para SSD, 4.0 para HDD."
-                read -rp "   Valor calculado [${PG_RAND_COST}]: " _v; PG_RAND_COST=${_v:-$PG_RAND_COST}
+                read -rp "   Valor calculado [${PG_RAND_COST}]: " _v
+                PG_RAND_COST=${_v:-$PG_RAND_COST}
             fi
             validate_size "$PG_SHARED_BUF" "shared_buffers"
             validate_size "$PG_WORK_MEM" "work_mem"
@@ -3323,7 +3572,16 @@ EOF
         echo -e "   ${VERDE}Fuso configurado: ${NEGRITO}${DB_TIMEZONE}${RESET}"
     }
 
-    m_clean; m_update; m_versions; m_zbxserver_ip; m_dbcreds; m_agent; m_max_connections; m_tsdb_tune; m_pgtuning; m_timezone
+    m_clean
+    m_update
+    m_versions
+    m_zbxserver_ip
+    m_dbcreds
+    m_agent
+    m_max_connections
+    m_tsdb_tune
+    m_pgtuning
+    m_timezone
 
     # Menu de revisão
     while true; do
@@ -3336,7 +3594,10 @@ EOF
         echo -e "  ${AMARELO}3)${RESET} Versão Zabbix alvo:   ${VERDE}${ZBX_TARGET_VERSION}${RESET}"
         echo -e "  ${AMARELO}4)${RESET} Versão PostgreSQL:    ${VERDE}${PG_VER}${RESET}"
         echo -e "  ${AMARELO}5)${RESET} PG listen_addresses:  ${CIANO}${PG_LISTEN_ADDR}${RESET}  ${AMARELO}← esta máquina BD${RESET}"
-        echo -e "  ${AMARELO}6)${RESET} Acesso Remoto (IPs):  ${NEGRITO}$(IFS=', '; echo "${ZBX_SERVER_IPS[*]:-<não definido>}")${RESET}  ${AMARELO}← Zabbix Server (pg_hba.conf)${RESET}"
+        echo -e "  ${AMARELO}6)${RESET} Acesso Remoto (IPs):  ${NEGRITO}$(
+            IFS=', '
+            echo "${ZBX_SERVER_IPS[*]:-<não definido>}"
+        )${RESET}  ${AMARELO}← Zabbix Server (pg_hba.conf)${RESET}"
         echo -e "  ${AMARELO}7)${RESET} BD / Utilizador:      ${CIANO}${DB_NAME}${RESET} / ${CIANO}${DB_USER}${RESET}"
         echo -e "  ${AMARELO}8)${RESET} Senha BD:             ${CIANO}$(mask_secret "$DB_PASS")${RESET}"
         echo -e "  ${AMARELO}9)${RESET} Zabbix Agent 2:       $([[ "$INSTALL_AGENT" == "1" ]] && echo -e "${VERDE}INSTALAR (${AG_HOSTNAME} | Zabbix ${ZBX_AGENT_VERSION})${RESET}" || echo "NÃO")"
@@ -3350,10 +3611,14 @@ EOF
         echo -e "${CIANO}------------------------------------------------------------${RESET}"
         read -rp "Insira o número da secção a alterar ou 0 para executar: " rev_opt
         case $rev_opt in
-            2) m_update ;; 3|4) m_versions ;; 5|6) m_zbxserver_ip ;; 7|8) m_dbcreds ;;
-            9|10) m_agent ;; 11) m_max_connections ;; 12) m_tsdb_tune ;; 13) m_pgtuning ;;
-            14) m_timezone ;;
-            15) echo -e "${VERMELHO}Instalação abortada pelo utilizador.${RESET}"; exit 1 ;; 0) break ;;
+        2) m_update ;; 3 | 4) m_versions ;; 5 | 6) m_zbxserver_ip ;; 7 | 8) m_dbcreds ;;
+        9 | 10) m_agent ;; 11) m_max_connections ;; 12) m_tsdb_tune ;; 13) m_pgtuning ;;
+        14) m_timezone ;;
+        15)
+            echo -e "${VERMELHO}Instalação abortada pelo utilizador.${RESET}"
+            exit 1
+            ;;
+        0) break ;;
         esac
     done
 
@@ -3362,13 +3627,14 @@ EOF
     validate_compatibility_matrix "db"
     echo -e "\n${CIANO}${NEGRITO}A processar pipeline... Não cancele a operação!${RESET}\n"
     preflight_install_check "db" 4096 1024
-    TOTAL_STEPS=20  # +1 para apt-mark hold
-    [[ "$CLEAN_INSTALL" == "1" ]] && TOTAL_STEPS=$(( TOTAL_STEPS + 3 ))
-    [[ "$UPDATE_SYSTEM" == "1" ]] && TOTAL_STEPS=$(( TOTAL_STEPS + 1 ))
-    [[ "$INSTALL_AGENT" == "1" ]] && TOTAL_STEPS=$(( TOTAL_STEPS + 9 ))
-    [[ "$USE_PSK" == "1" && "$INSTALL_AGENT" == "1" ]] && TOTAL_STEPS=$(( TOTAL_STEPS + 1 ))
-    _IS_CONTAINER=0; systemd-detect-virt -c -q 2>/dev/null && _IS_CONTAINER=1 || true
-    [[ "$_IS_CONTAINER" == "0" ]] && TOTAL_STEPS=$(( TOTAL_STEPS + 2 ))  # timedatectl + NTP
+    TOTAL_STEPS=20 # +1 para apt-mark hold
+    [[ "$CLEAN_INSTALL" == "1" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 3))
+    [[ "$UPDATE_SYSTEM" == "1" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 1))
+    [[ "$INSTALL_AGENT" == "1" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 9))
+    [[ "$USE_PSK" == "1" && "$INSTALL_AGENT" == "1" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 1))
+    _IS_CONTAINER=0
+    systemd-detect-virt -c -q 2>/dev/null && _IS_CONTAINER=1 || true
+    [[ "$_IS_CONTAINER" == "0" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 2)) # timedatectl + NTP
     [[ "$SIMULATE_MODE" == "1" ]] && echo -e "\n${CIANO}${NEGRITO}SIMULAÇÃO DO PIPELINE — BASE DE DADOS${RESET}\n"
 
     if [[ "$CLEAN_INSTALL" == "1" ]]; then
@@ -3398,7 +3664,7 @@ EOF
     [[ "$SIMULATE_MODE" != "1" ]] && validate_packages_available \
         curl wget ca-certificates gnupg apt-transport-https lsb-release locales
 
-    [[ "$INSTALL_AGENT" == "1" ]] && \
+    [[ "$INSTALL_AGENT" == "1" ]] &&
         run_step "Removendo instalação anterior do Zabbix Agent 2 da BD" bash -c \
             "timeout 15 systemctl stop zabbix-agent2 2>/dev/null || true; \
              systemctl disable zabbix-agent2 2>/dev/null || true; \
@@ -3407,7 +3673,7 @@ EOF
              apt-get purge -y zabbix-agent2 2>/dev/null || true; \
              rm -rf /etc/zabbix /var/lib/zabbix /var/log/zabbix /run/zabbix 2>/dev/null || true"
 
-    [[ "$UPDATE_SYSTEM" == "1" ]] && \
+    [[ "$UPDATE_SYSTEM" == "1" ]] &&
         run_step "Realizando upgrade seguro dos pacotes do sistema" apt-get upgrade "${APT_FLAGS[@]}"
 
     run_step "Instalando dependências base" apt-get install "${APT_FLAGS[@]}" \
@@ -3437,7 +3703,7 @@ EOF
             https://www.postgresql.org/media/keys/ACCC4CF8.asc
         echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
 https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
-            > /etc/apt/sources.list.d/pgdg.list
+            >/etc/apt/sources.list.d/pgdg.list
     }
     run_step "Adicionando repositório PGDG (PostgreSQL oficial)" setup_pgdg_repo
 
@@ -3472,10 +3738,10 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
     if [[ "$TSDB_AVAILABLE" == "1" ]]; then
         setup_tsdb_repo() {
             # --batch --yes: evita prompt "File exists. Overwrite?" em reinstalações
-            _curl -fsSL https://packagecloud.io/timescale/timescaledb/gpgkey \
-                | gpg --batch --yes --dearmor -o /etc/apt/trusted.gpg.d/timescaledb.gpg
+            _curl -fsSL https://packagecloud.io/timescale/timescaledb/gpgkey |
+                gpg --batch --yes --dearmor -o /etc/apt/trusted.gpg.d/timescaledb.gpg
             echo "deb https://packagecloud.io/timescale/timescaledb/$(timescale_repo_os)/ ${U_CODENAME} main" \
-                > /etc/apt/sources.list.d/timescaledb.list
+                >/etc/apt/sources.list.d/timescaledb.list
         }
         run_step "Adicionando repositório TimescaleDB" setup_tsdb_repo
     fi
@@ -3553,7 +3819,7 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
         if command -v pg_ctlcluster >/dev/null 2>&1; then
             timeout 30 pg_ctlcluster "$PG_VER" "$PG_CLUSTER_NAME" start 2>/dev/null || true
         fi
-        timeout 20 systemctl start "postgresql@${PG_VER}-${PG_CLUSTER_NAME}" 2>/dev/null || \
+        timeout 20 systemctl start "postgresql@${PG_VER}-${PG_CLUSTER_NAME}" 2>/dev/null ||
             timeout 20 systemctl start postgresql 2>/dev/null || true
 
         echo -e "  ${VERDE}Cluster PostgreSQL ativo/validado: ${PG_VER}/${PG_CLUSTER_NAME}${RESET}"
@@ -3577,8 +3843,8 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
             elif grep -qE "^[[:space:]]*shared_preload_libraries[[:space:]]*=" "$PG_CONF" 2>/dev/null; then
                 sed -i "s|^[[:space:]]*shared_preload_libraries[[:space:]]*=\s*'\([^']*\)'|shared_preload_libraries = '\1,${lib}'|" "$PG_CONF"
             else
-                sed -i "0,/^#[[:space:]]*shared_preload_libraries/{s|^#[[:space:]]*shared_preload_libraries.*|shared_preload_libraries = '${lib}'|}" "$PG_CONF" 2>/dev/null || \
-                echo "shared_preload_libraries = '${lib}'" >> "$PG_CONF"
+                sed -i "0,/^#[[:space:]]*shared_preload_libraries/{s|^#[[:space:]]*shared_preload_libraries.*|shared_preload_libraries = '${lib}'|}" "$PG_CONF" 2>/dev/null ||
+                    echo "shared_preload_libraries = '${lib}'" >>"$PG_CONF"
             fi
         }
 
@@ -3590,15 +3856,15 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
                 return 1
             fi
             calc_pg_auto_tuning
-            max_workers=$(( CPU_CORES + 4 ))
-            (( max_workers < 8 )) && max_workers=8
-            (( max_workers > 16 )) && max_workers=16
+            max_workers=$((CPU_CORES + 4))
+            ((max_workers < 8)) && max_workers=8
+            ((max_workers > 16)) && max_workers=16
             ts_workers="$CPU_CORES"
-            (( ts_workers < 2 )) && ts_workers=2
-            (( ts_workers > 8 )) && ts_workers=8
+            ((ts_workers < 2)) && ts_workers=2
+            ((ts_workers > 8)) && ts_workers=8
             parallel_workers="$CPU_CORES"
-            (( parallel_workers < 2 )) && parallel_workers=2
-            (( parallel_workers > 8 )) && parallel_workers=8
+            ((parallel_workers < 2)) && parallel_workers=2
+            ((parallel_workers > 8)) && parallel_workers=8
 
             set_pg_config "$PG_CONF" "shared_buffers" "$PG_SHARED_BUF"
             set_pg_config "$PG_CONF" "effective_cache_size" "$PG_EFF_CACHE"
@@ -3617,7 +3883,7 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
         run_tsdb_tune() {
             TSDB_TUNE_STATUS="não executado"
             # Garante que o PostgreSQL está iniciado antes do tune
-            timeout 20 systemctl start "postgresql@${PG_VER}-${PG_CLUSTER_NAME}" 2>/dev/null || \
+            timeout 20 systemctl start "postgresql@${PG_VER}-${PG_CLUSTER_NAME}" 2>/dev/null ||
                 timeout 20 systemctl start postgresql 2>/dev/null || true
             if [[ "${_IS_CONTAINER:-0}" == "1" ]]; then
                 TSDB_TUNE_STATUS="ignorado em container/LXC; tuning seguro aplicado pelo instalador"
@@ -3660,14 +3926,14 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
         # max_connections é sempre aplicado — configurado como questão independente
         set_pg_config "$PG_CONF" "max_connections" "$PG_MAX_CONN"
         if [[ "$USE_TUNING" == "1" ]]; then
-            set_pg_config "$PG_CONF" "shared_buffers"                "$PG_SHARED_BUF"
-            set_pg_config "$PG_CONF" "work_mem"                      "$PG_WORK_MEM"
-            set_pg_config "$PG_CONF" "maintenance_work_mem"          "$PG_MAINT_MEM"
-            set_pg_config "$PG_CONF" "effective_cache_size"          "$PG_EFF_CACHE"
-            set_pg_config "$PG_CONF" "wal_buffers"                   "$PG_WAL_BUFS"
-            set_pg_config "$PG_CONF" "checkpoint_completion_target"  "$PG_CKPT"
-            set_pg_config "$PG_CONF" "default_statistics_target"     "$PG_STATS"
-            set_pg_config "$PG_CONF" "random_page_cost"              "$PG_RAND_COST"
+            set_pg_config "$PG_CONF" "shared_buffers" "$PG_SHARED_BUF"
+            set_pg_config "$PG_CONF" "work_mem" "$PG_WORK_MEM"
+            set_pg_config "$PG_CONF" "maintenance_work_mem" "$PG_MAINT_MEM"
+            set_pg_config "$PG_CONF" "effective_cache_size" "$PG_EFF_CACHE"
+            set_pg_config "$PG_CONF" "wal_buffers" "$PG_WAL_BUFS"
+            set_pg_config "$PG_CONF" "checkpoint_completion_target" "$PG_CKPT"
+            set_pg_config "$PG_CONF" "default_statistics_target" "$PG_STATS"
+            set_pg_config "$PG_CONF" "random_page_cost" "$PG_RAND_COST"
         fi
     }
     run_step "Configurando postgresql.conf (listen_addresses + tuning)" configure_postgres
@@ -3681,12 +3947,12 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
         sed -i "/^host[[:space:]]\+${DB_NAME}[[:space:]]\+${DB_USER}/d" "$PG_HBA" 2>/dev/null || true
         for entry in "${ZBX_SERVER_IPS[@]}"; do
             if [[ "$entry" == "0.0.0.0" || "$entry" == "0.0.0.0/0" ]]; then
-                echo "host    ${DB_NAME}    ${DB_USER}    0.0.0.0/0               scram-sha-256" >> "$PG_HBA"
-                echo "host    ${DB_NAME}    ${DB_USER}    ::0/0                   scram-sha-256" >> "$PG_HBA"
+                echo "host    ${DB_NAME}    ${DB_USER}    0.0.0.0/0               scram-sha-256" >>"$PG_HBA"
+                echo "host    ${DB_NAME}    ${DB_USER}    ::0/0                   scram-sha-256" >>"$PG_HBA"
             elif [[ "$entry" =~ / ]]; then
-                echo "host    ${DB_NAME}    ${DB_USER}    ${entry}    scram-sha-256" >> "$PG_HBA"
+                echo "host    ${DB_NAME}    ${DB_USER}    ${entry}    scram-sha-256" >>"$PG_HBA"
             else
-                echo "host    ${DB_NAME}    ${DB_USER}    ${entry}/32             scram-sha-256" >> "$PG_HBA"
+                echo "host    ${DB_NAME}    ${DB_USER}    ${entry}/32             scram-sha-256" >>"$PG_HBA"
             fi
         done
     }
@@ -3695,14 +3961,14 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
         if command -v pg_ctlcluster >/dev/null 2>&1; then
             timeout 45 pg_ctlcluster "$PG_VER" "$PG_CLUSTER_NAME" restart
         else
-            timeout 45 systemctl restart "postgresql@${PG_VER}-${PG_CLUSTER_NAME}" 2>/dev/null || \
+            timeout 45 systemctl restart "postgresql@${PG_VER}-${PG_CLUSTER_NAME}" 2>/dev/null ||
                 timeout 45 systemctl restart postgresql
         fi
     }
     wait_for_postgres_ready() {
         local timeout_s="${1:-30}" waited=0 cluster_service="postgresql@${PG_VER}-${PG_CLUSTER_NAME}"
         log_msg "INFO" "Aguardando PostgreSQL ${PG_VER}/${PG_CLUSTER_NAME} responder por até ${timeout_s}s"
-        while (( waited < timeout_s )); do
+        while ((waited < timeout_s)); do
             if command -v pg_isready >/dev/null 2>&1 && timeout 5 pg_isready -q -h /var/run/postgresql -p 5432 2>/dev/null; then
                 echo -e "  ${VERDE}✔${RESET} PostgreSQL ${PG_VER}/${PG_CLUSTER_NAME}: pronto após ${waited}s"
                 log_msg "OK" "PostgreSQL ${PG_VER}/${PG_CLUSTER_NAME} pronto após ${waited}s"
@@ -3714,7 +3980,7 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
                 return 0
             fi
             sleep 2
-            waited=$(( waited + 2 ))
+            waited=$((waited + 2))
         done
         echo -e "\n${VERMELHO}${NEGRITO}ERRO:${RESET} PostgreSQL ${PG_VER}/${PG_CLUSTER_NAME} não ficou pronto em ${timeout_s}s."
         echo -e "  Diagnóstico sugerido: journalctl -u ${cluster_service} -n 80 --no-pager"
@@ -3733,12 +3999,12 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
         DB_PASS_SQL=$(sql_quote_literal "$DB_PASS")
         DB_USER_IDENT=$(sql_quote_ident "$DB_USER")
         DB_NAME_IDENT=$(sql_quote_ident "$DB_NAME")
-        postgres_psql_timeout 45 -tc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" \
-            | awk '$1==1{found=1} END{exit !found}' 2>/dev/null || \
+        postgres_psql_timeout 45 -tc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" |
+            awk '$1==1{found=1} END{exit !found}' 2>/dev/null ||
             postgres_psql_timeout 45 -c "CREATE USER ${DB_USER_IDENT} WITH PASSWORD ${DB_PASS_SQL};"
         postgres_psql_timeout 45 -c "ALTER USER ${DB_USER_IDENT} WITH PASSWORD ${DB_PASS_SQL};"
-        postgres_psql_timeout 45 -tc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" \
-            | awk '$1==1{found=1} END{exit !found}' 2>/dev/null || \
+        postgres_psql_timeout 45 -tc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" |
+            awk '$1==1{found=1} END{exit !found}' 2>/dev/null ||
             postgres_psql_timeout 45 -c "CREATE DATABASE ${DB_NAME_IDENT} OWNER ${DB_USER_IDENT} ENCODING 'UTF8' \
                 LC_COLLATE='en_US.UTF-8' LC_CTYPE='en_US.UTF-8' TEMPLATE template0;"
         postgres_psql_timeout 45 -c "GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME_IDENT} TO ${DB_USER_IDENT};"
@@ -3766,11 +4032,11 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
     wait_for_postgres_ready 30
 
     AG_F="/etc/zabbix/zabbix_agent2.conf"
-    if [[ "$INSTALL_AGENT" == "1" && ( -f "$AG_F" || "$SIMULATE_MODE" == "1" ) ]]; then
+    if [[ "$INSTALL_AGENT" == "1" && (-f "$AG_F" || "$SIMULATE_MODE" == "1") ]]; then
         apply_db_agent_config() {
-            set_config "$AG_F" "Server"       "$AG_SERVER"
+            set_config "$AG_F" "Server" "$AG_SERVER"
             set_config "$AG_F" "ServerActive" "$AG_SERVER_ACTIVE"
-            set_config "$AG_F" "Hostname"     "$AG_HOSTNAME"
+            set_config "$AG_F" "Hostname" "$AG_HOSTNAME"
             [[ "$AG_ALLOWKEY" == "1" ]] && set_config "$AG_F" "AllowKey" "system.run[*]"
         }
         run_step "Configurando Zabbix Agent 2 da BD" apply_db_agent_config
@@ -3783,13 +4049,13 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
             PSK_AGENT_KEY=$(openssl rand -hex 32)
         fi
         apply_db_agent_psk() {
-            echo "$PSK_AGENT_KEY" > /etc/zabbix/zabbix_agent2.psk
+            echo "$PSK_AGENT_KEY" >/etc/zabbix/zabbix_agent2.psk
             chown zabbix:zabbix /etc/zabbix/zabbix_agent2.psk
             chmod 600 /etc/zabbix/zabbix_agent2.psk
-            set_config "$AG_F" "TLSAccept"      "psk"
-            set_config "$AG_F" "TLSConnect"     "psk"
+            set_config "$AG_F" "TLSAccept" "psk"
+            set_config "$AG_F" "TLSConnect" "psk"
             set_config "$AG_F" "TLSPSKIdentity" "$PSK_AGENT_ID"
-            set_config "$AG_F" "TLSPSKFile"     "/etc/zabbix/zabbix_agent2.psk"
+            set_config "$AG_F" "TLSPSKFile" "/etc/zabbix/zabbix_agent2.psk"
         }
         run_step "Gerando e aplicando chave PSK do Agent 2 da BD" apply_db_agent_psk
     fi
@@ -3811,15 +4077,19 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
     [[ "$SIMULATE_MODE" == "1" ]] && finish_simulation
     post_validate_installation "db"
     if [[ "$_CRITICAL_SERVICES_OK" == "1" ]]; then
-        CURRENT_STEP=$TOTAL_STEPS; draw_progress "Instalação Perfeita! ✔"; printf "\n"
+        CURRENT_STEP=$TOTAL_STEPS
+        draw_progress "Instalação Perfeita! ✔"
+        printf "\n"
     else
-        CURRENT_STEP=$TOTAL_STEPS; draw_progress "Instalação com Avisos ⚠"; printf "\n"
+        CURRENT_STEP=$TOTAL_STEPS
+        draw_progress "Instalação com Avisos ⚠"
+        printf "\n"
     fi
 
     # Certificado
     clear
     start_certificate_export "db"
-    [[ "$_CRITICAL_SERVICES_OK" != "1" ]] && \
+    [[ "$_CRITICAL_SERVICES_OK" != "1" ]] &&
         echo -e "${VERMELHO}${NEGRITO}⚠ UM OU MAIS SERVIÇOS CRÍTICOS NÃO ESTÃO ATIVOS. Verifique acima e execute: journalctl -xe --no-pager${RESET}\n"
     HOST_IP=$(hostname -I | awk '{print $1}')
     PG_CONF="${PG_CONF_FILE:-/etc/postgresql/${PG_VER}/${PG_CLUSTER_NAME}/postgresql.conf}"
@@ -3828,15 +4098,18 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
     echo -e "${VERDE}${NEGRITO}║           CERTIFICADO — CAMADA DE BASE DE DADOS          ║${RESET}"
     echo -e "${VERDE}${NEGRITO}╚══════════════════════════════════════════════════════════╝${RESET}"
     echo -e "\n${CIANO}${NEGRITO}▸ SISTEMA OPERACIONAL + HARDWARE${RESET}"
-    command -v lsb_release >/dev/null 2>&1 && \
-        printf "  %-34s %s\n" "Distribuição:" "$(lsb_release -ds)" || \
+    command -v lsb_release >/dev/null 2>&1 &&
+        printf "  %-34s %s\n" "Distribuição:" "$(lsb_release -ds)" ||
         printf "  %-34s %s\n" "Sistema:" "$OS_DISPLAY"
     printf "  %-34s %s\n" "Kernel:" "$(uname -r)"
     printf "  %-34s %s\n" "RAM total:" "${RAM_MB} MB"
     printf "  %-34s %s\n" "Núcleos CPU:" "${CPU_CORES}"
     echo -e "\n${CIANO}${NEGRITO}▸ REDE DO HOST${RESET}"
     printf "  %-34s %s\n" "IP desta máquina (BD):" "$HOST_IP"
-    printf "  %-34s %s\n" "IPs autorizados (pg_hba.conf):" "$(IFS=', '; echo "${ZBX_SERVER_IPS[*]}")"
+    printf "  %-34s %s\n" "IPs autorizados (pg_hba.conf):" "$(
+        IFS=', '
+        echo "${ZBX_SERVER_IPS[*]}"
+    )"
     printf "  %-34s %s\n" "Porta PostgreSQL (TCP):" "5432"
     echo -e "\n${CIANO}${NEGRITO}▸ ESTADO DOS SERVIÇOS${RESET}"
     PG_SVC_NAME="postgresql"
@@ -3848,8 +4121,8 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
         printf "  %-34s ${VERMELHO}%s${RESET}\n" "postgresql:" "FALHOU ✖"
     fi
     if [[ "$INSTALL_AGENT" == "1" ]]; then
-        systemctl is-active --quiet zabbix-agent2 2>/dev/null && \
-            printf "  %-34s ${VERDE}%s${RESET}\n" "zabbix-agent2:" "ATIVO ✔" || \
+        systemctl is-active --quiet zabbix-agent2 2>/dev/null &&
+            printf "  %-34s ${VERDE}%s${RESET}\n" "zabbix-agent2:" "ATIVO ✔" ||
             printf "  %-34s ${VERMELHO}%s${RESET}\n" "zabbix-agent2:" "FALHOU ✖"
     fi
     echo -e "\n${CIANO}${NEGRITO}▸ VERSÕES DOS PACOTES INSTALADOS${RESET}"
@@ -3879,30 +4152,30 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
     echo -e "${AMARELO}${NEGRITO}╚══════════════════════════════════════════════════════════╝${RESET}"
     echo -e "  ------------------------------------------------------------"
     printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "IP desta máquina (DB Host):" "$HOST_IP"
-    printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Porta DB:"                  "5432"
-    printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Nome da Base de Dados:"     "$DB_NAME"
-    printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Utilizador:"                "$DB_USER"
-    printf "  ${NEGRITO}%-32s${RESET} ${VERMELHO}%s${RESET}\n" "Senha:"                  "$DB_PASS"
-    printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "DBUser:"                    "$DB_USER"
-    printf "  ${NEGRITO}%-32s${RESET} ${VERMELHO}%s${RESET}\n" "DBPassword:"                "$DB_PASS"
-    printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "PostgreSQL versão:"         "$PG_VER"
+    printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Porta DB:" "5432"
+    printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Nome da Base de Dados:" "$DB_NAME"
+    printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Utilizador:" "$DB_USER"
+    printf "  ${NEGRITO}%-32s${RESET} ${VERMELHO}%s${RESET}\n" "Senha:" "$DB_PASS"
+    printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "DBUser:" "$DB_USER"
+    printf "  ${NEGRITO}%-32s${RESET} ${VERMELHO}%s${RESET}\n" "DBPassword:" "$DB_PASS"
+    printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "PostgreSQL versão:" "$PG_VER"
     if [[ "$TSDB_AVAILABLE" == "1" ]]; then
-        printf "  ${NEGRITO}%-32s${RESET} ${VERDE}%s${RESET}\n" "TimescaleDB:"               "INSTALADO ✔  (importar timescaledb.sql no Server)"
+        printf "  ${NEGRITO}%-32s${RESET} ${VERDE}%s${RESET}\n" "TimescaleDB:" "INSTALADO ✔  (importar timescaledb.sql no Server)"
     else
-        printf "  ${NEGRITO}%-32s${RESET} ${AMARELO}%s${RESET}\n" "TimescaleDB:"               "NÃO INSTALADO — repositório/pacote indisponível"
+        printf "  ${NEGRITO}%-32s${RESET} ${AMARELO}%s${RESET}\n" "TimescaleDB:" "NÃO INSTALADO — repositório/pacote indisponível"
     fi
     echo -e "  ------------------------------------------------------------"
     if [[ "$INSTALL_AGENT" == "1" ]]; then
         echo -e "\n${AMARELO}${NEGRITO}▸ CREDENCIAIS PARA CADASTRAR O AGENT 2 DA BD${RESET}"
         echo -e "  ------------------------------------------------------------"
-        printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "IP desta máquina:"      "$HOST_IP"
-        printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Hostname Agente:"       "$AG_HOSTNAME"
-        printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Server:"                "$AG_SERVER"
-        printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "ServerActive:"          "$AG_SERVER_ACTIVE"
-        printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Versão repo Zabbix:"    "$ZBX_AGENT_VERSION"
+        printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "IP desta máquina:" "$HOST_IP"
+        printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Hostname Agente:" "$AG_HOSTNAME"
+        printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Server:" "$AG_SERVER"
+        printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "ServerActive:" "$AG_SERVER_ACTIVE"
+        printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Versão repo Zabbix:" "$ZBX_AGENT_VERSION"
         if [[ "$USE_PSK" == "1" ]]; then
-            printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "PSK Identity:"          "$PSK_AGENT_ID"
-            printf "  ${NEGRITO}%-32s${RESET} ${VERMELHO}%s${RESET}\n" "PSK Secret Key:"        "$PSK_AGENT_KEY"
+            printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "PSK Identity:" "$PSK_AGENT_ID"
+            printf "  ${NEGRITO}%-32s${RESET} ${VERMELHO}%s${RESET}\n" "PSK Secret Key:" "$PSK_AGENT_KEY"
         fi
         echo -e "  ------------------------------------------------------------"
     fi
@@ -3913,7 +4186,6 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
     echo -e "\n${NEGRITO}Log completo:${RESET} $LOG_FILE\n"
     ;;
 
-
 # ══════════════════════════════════════════════════════════════════════════════
 # COMPONENTE 2 — SERVIDOR (Zabbix Server + Frontend + Nginx) — Server v1.7
 # ══════════════════════════════════════════════════════════════════════════════
@@ -3923,17 +4195,41 @@ server)
     set_default_php_for_os() {
         if [[ "$OS_FAMILY" == "debian" ]]; then
             case "$U_VER" in
-                "12") PHP_VER="8.2"; NEED_PHP_PPA=0 ;;
-                "13") PHP_VER="8.4"; NEED_PHP_PPA=0 ;;
-                *)    PHP_VER="8.2"; NEED_PHP_PPA=0 ;;
+            "12")
+                PHP_VER="8.2"
+                NEED_PHP_PPA=0
+                ;;
+            "13")
+                PHP_VER="8.4"
+                NEED_PHP_PPA=0
+                ;;
+            *)
+                PHP_VER="8.2"
+                NEED_PHP_PPA=0
+                ;;
             esac
         else
             case "$U_VER" in
-                "20.04") PHP_VER="8.1"; NEED_PHP_PPA=1 ;;
-                "22.04") PHP_VER="8.1"; NEED_PHP_PPA=0 ;;
-                "24.04") PHP_VER="8.3"; NEED_PHP_PPA=0 ;;
-                "26.04") PHP_VER="8.5"; NEED_PHP_PPA=0 ;;
-                *)       PHP_VER="8.1"; NEED_PHP_PPA=0 ;;
+            "20.04")
+                PHP_VER="8.1"
+                NEED_PHP_PPA=1
+                ;;
+            "22.04")
+                PHP_VER="8.1"
+                NEED_PHP_PPA=0
+                ;;
+            "24.04")
+                PHP_VER="8.3"
+                NEED_PHP_PPA=0
+                ;;
+            "26.04")
+                PHP_VER="8.5"
+                NEED_PHP_PPA=0
+                ;;
+            *)
+                PHP_VER="8.1"
+                NEED_PHP_PPA=0
+                ;;
             esac
         fi
     }
@@ -3947,7 +4243,7 @@ server)
         if [[ "$ZBX_VERSION" == "8.0" ]]; then
             # Converte "8.1" → 81, "8.2" → 82, etc. para comparação numérica
             local php_num="${PHP_VER//./}"
-            if (( php_num < 82 )); then
+            if ((php_num < 82)); then
                 echo -e "\n${AMARELO}${NEGRITO}⚠ Zabbix 8.0 requer PHP 8.2+.${RESET}"
                 if [[ "$OS_FAMILY" == "ubuntu" ]]; then
                     echo -e "  Ubuntu ${U_VER} tem PHP ${PHP_VER} nativo — será instalado PPA ondrej/php com PHP 8.2."
@@ -3969,53 +4265,104 @@ server)
     log_msg "INFO" "Log iniciado para componente Server em ${LOG_FILE}"
 
     # Variáveis de estado
-    ZBX_VERSION="7.0"; PG_VER="17"
-    DB_HOST=""; DB_PORT="5432"; DB_NAME="zabbix"; DB_USER="zabbix"; DB_PASS=""
+    ZBX_VERSION="7.0"
+    PG_VER="17"
+    DB_HOST=""
+    DB_PORT="5432"
+    DB_NAME="zabbix"
+    DB_USER="zabbix"
+    DB_PASS=""
     USE_TIMESCALE="0"
-    ZBX_DB_DETECTED=""          # valor 'mandatory' da tabela dbversion (vazio = BD sem schema Zabbix)
-    USE_HTTPS="0"; SSL_TYPE="self-signed"
-    SSL_CERT="/etc/ssl/zabbix/zabbix.crt"; SSL_KEY="/etc/ssl/zabbix/zabbix.key"
+    ZBX_DB_DETECTED="" # valor 'mandatory' da tabela dbversion (vazio = BD sem schema Zabbix)
+    USE_HTTPS="0"
+    SSL_TYPE="self-signed"
+    SSL_CERT="/etc/ssl/zabbix/zabbix.crt"
+    SSL_KEY="/etc/ssl/zabbix/zabbix.key"
     USE_HTTP_REDIRECT="0"
-    NGINX_PORT="80"; SERVER_NAME="_"; TIMEZONE="${SYS_TIMEZONE:-America/Sao_Paulo}"
-    INSTALL_AGENT="0"; USE_PSK="0"; PSK_AGENT_ID=""; PSK_AGENT_KEY=""
-    AG_SERVER="127.0.0.1"; AG_SERVER_ACTIVE="127.0.0.1"
-    AG_HOSTNAME=""; AG_ALLOWKEY="0"; ENABLE_REMOTE="0"
-    USE_TUNING="0"; UPDATE_SYSTEM="0"; CLEAN_INSTALL=0
+    NGINX_PORT="80"
+    SERVER_NAME="_"
+    TIMEZONE="${SYS_TIMEZONE:-America/Sao_Paulo}"
+    INSTALL_AGENT="0"
+    USE_PSK="0"
+    PSK_AGENT_ID=""
+    PSK_AGENT_KEY=""
+    AG_SERVER="127.0.0.1"
+    AG_SERVER_ACTIVE="127.0.0.1"
+    AG_HOSTNAME=""
+    AG_ALLOWKEY="0"
+    ENABLE_REMOTE="0"
+    USE_TUNING="0"
+    UPDATE_SYSTEM="0"
+    CLEAN_INSTALL=0
     PHP_UPLOAD_SIZE="32M"
-    T_CACHE="256M"; T_HCACHE="128M"; T_HICACHE="32M"; T_VCACHE="256M"; T_TRCACHE="32M"
-    T_POLL="20"; T_PUNREACH="5"; T_TRAP="10"; T_PREPROC="16"; T_DBSYNC="4"
-    T_PING="5"; T_DISC="5"; T_HTTP="5"; T_APOLL="1"; T_HAPOLL="1"
-    T_SPOLL="10"; T_BPOLL="1"; T_ODBCPOLL="1"; T_MAXC="1000"; T_UNREACH="45"
-    T_TOUT="5"; T_HK="1"; T_SLOWQ="3000"
+    T_CACHE="256M"
+    T_HCACHE="128M"
+    T_HICACHE="32M"
+    T_VCACHE="256M"
+    T_TRCACHE="32M"
+    T_POLL="20"
+    T_PUNREACH="5"
+    T_TRAP="10"
+    T_PREPROC="16"
+    T_DBSYNC="4"
+    T_PING="5"
+    T_DISC="5"
+    T_HTTP="5"
+    T_APOLL="1"
+    T_HAPOLL="1"
+    T_SPOLL="10"
+    T_BPOLL="1"
+    T_ODBCPOLL="1"
+    T_MAXC="1000"
+    T_UNREACH="45"
+    T_TOUT="5"
+    T_HK="1"
+    T_SLOWQ="3000"
 
     clamp_int() {
         local value="$1" min="$2" max="$3"
-        (( value < min )) && value="$min"
-        (( value > max )) && value="$max"
+        ((value < min)) && value="$min"
+        ((value > max)) && value="$max"
         echo "$value"
     }
 
     calc_server_auto_performance() {
-        if (( RAM_MB < 4096 )); then
+        if ((RAM_MB < 4096)); then
             SERVER_PERF_PROFILE="mínimo"
-            T_CACHE="64M";  T_VCACHE="64M";  T_HCACHE="64M";  T_TRCACHE="16M"; T_DBSYNC="2"
-            T_POLL=$(clamp_int $(( CPU_CORES * 2 )) 4 8)
-            T_PREPROC=$(clamp_int $(( CPU_CORES * 1 )) 2 4)
-        elif (( RAM_MB < 8192 )); then
+            T_CACHE="64M"
+            T_VCACHE="64M"
+            T_HCACHE="64M"
+            T_TRCACHE="16M"
+            T_DBSYNC="2"
+            T_POLL=$(clamp_int $((CPU_CORES * 2)) 4 8)
+            T_PREPROC=$(clamp_int $((CPU_CORES * 1)) 2 4)
+        elif ((RAM_MB < 8192)); then
             SERVER_PERF_PROFILE="baixo"
-            T_CACHE="128M"; T_VCACHE="128M"; T_HCACHE="128M"; T_TRCACHE="32M"; T_DBSYNC="2"
-            T_POLL=$(clamp_int $(( CPU_CORES * 4 )) 8 12)
-            T_PREPROC=$(clamp_int $(( CPU_CORES * 2 )) 4 8)
-        elif (( RAM_MB <= 16384 )); then
+            T_CACHE="128M"
+            T_VCACHE="128M"
+            T_HCACHE="128M"
+            T_TRCACHE="32M"
+            T_DBSYNC="2"
+            T_POLL=$(clamp_int $((CPU_CORES * 4)) 8 12)
+            T_PREPROC=$(clamp_int $((CPU_CORES * 2)) 4 8)
+        elif ((RAM_MB <= 16384)); then
             SERVER_PERF_PROFILE="médio"
-            T_CACHE="256M"; T_VCACHE="256M"; T_HCACHE="256M"; T_TRCACHE="64M"; T_DBSYNC="4"
-            T_POLL=$(clamp_int $(( CPU_CORES * 5 )) 16 30)
-            T_PREPROC=$(clamp_int $(( CPU_CORES * 3 )) 12 24)
+            T_CACHE="256M"
+            T_VCACHE="256M"
+            T_HCACHE="256M"
+            T_TRCACHE="64M"
+            T_DBSYNC="4"
+            T_POLL=$(clamp_int $((CPU_CORES * 5)) 16 30)
+            T_PREPROC=$(clamp_int $((CPU_CORES * 3)) 12 24)
         else
             SERVER_PERF_PROFILE="alto"
-            T_CACHE="512M"; T_VCACHE="512M"; T_HCACHE="512M"; T_TRCACHE="128M"; T_DBSYNC="8"
-            T_POLL=$(clamp_int $(( CPU_CORES * 6 )) 30 60)
-            T_PREPROC=$(clamp_int $(( CPU_CORES * 4 )) 24 48)
+            T_CACHE="512M"
+            T_VCACHE="512M"
+            T_HCACHE="512M"
+            T_TRCACHE="128M"
+            T_DBSYNC="8"
+            T_POLL=$(clamp_int $((CPU_CORES * 6)) 30 60)
+            T_PREPROC=$(clamp_int $((CPU_CORES * 4)) 24 48)
         fi
     }
     calc_server_auto_performance
@@ -4023,7 +4370,7 @@ server)
     # Banner Server
     clear
     echo -e "${VERMELHO}${NEGRITO}"
-    cat << "EOF"
+    cat <<"EOF"
  ██████╗███████╗██████╗ ██╗   ██╗███████╗██████╗
 ██╔════╝██╔════╝██╔══██╗██║   ██║██╔════╝██╔══██╗
 ╚█████╗ █████╗  ██████╔╝╚██╗ ██╔╝█████╗  ██████╔╝
@@ -4064,10 +4411,19 @@ EOF
         while true; do
             read -rp "   Escolha (1, 2 ou 3): " v_opt
             case "$v_opt" in
-                1) ZBX_VERSION="7.0"; break ;;
-                2) ZBX_VERSION="7.4"; break ;;
-                3) ZBX_VERSION="8.0"; break ;;
-                *) echo -e "   ${VERMELHO}Opção inválida.${RESET}" ;;
+            1)
+                ZBX_VERSION="7.0"
+                break
+                ;;
+            2)
+                ZBX_VERSION="7.4"
+                break
+                ;;
+            3)
+                ZBX_VERSION="8.0"
+                break
+                ;;
+            *) echo -e "   ${VERMELHO}Opção inválida.${RESET}" ;;
             esac
         done
         # Repõe PHP_VER e NEED_PHP_PPA aos valores padrão do SO antes de aplicar
@@ -4113,7 +4469,8 @@ EOF
         # — TimescaleDB —
         if [[ -n "$_tsdb_ver" ]]; then
             local _tsdb_status="${VERDE}✔ Compatível${RESET}"
-            local _tsdb_major; _tsdb_major=$(echo "$_tsdb_ver" | cut -d. -f1)
+            local _tsdb_major
+            _tsdb_major=$(echo "$_tsdb_ver" | cut -d. -f1)
             if [[ "$ZBX_VERSION" == "8.0" && "${_tsdb_major:-0}" -lt 2 ]]; then
                 _tsdb_status="${VERMELHO}✖ Requer TimescaleDB 2.x+${RESET}"
             fi
@@ -4131,16 +4488,21 @@ EOF
         local _incompativel=0
         local _schema_origem=""
         if [[ -n "$_zbx_dbver" && "$_zbx_dbver" =~ ^[0-9]+$ ]]; then
-            if   [[ "$_zbx_dbver" -ge 7050033 ]]; then _schema_origem="8.0"
-            elif [[ "$_zbx_dbver" -ge 7040000 ]]; then _schema_origem="7.4"
-            elif [[ "$_zbx_dbver" -ge 7000000 ]]; then _schema_origem="7.0"
-            elif [[ "$_zbx_dbver" -ge 6000000 ]]; then _schema_origem="6.x"
-            else                                        _schema_origem="<6.0"
+            if [[ "$_zbx_dbver" -ge 7050033 ]]; then
+                _schema_origem="8.0"
+            elif [[ "$_zbx_dbver" -ge 7040000 ]]; then
+                _schema_origem="7.4"
+            elif [[ "$_zbx_dbver" -ge 7000000 ]]; then
+                _schema_origem="7.0"
+            elif [[ "$_zbx_dbver" -ge 6000000 ]]; then
+                _schema_origem="6.x"
+            else
+                _schema_origem="<6.0"
             fi
             case "$ZBX_VERSION" in
-                "7.0") [[ "$_zbx_dbver" -lt 7000000 || "$_zbx_dbver" -ge 7040000 ]] && _incompativel=1 ;;
-                "7.4") [[ "$_zbx_dbver" -lt 7040000 || "$_zbx_dbver" -ge 7050033 ]] && _incompativel=1 ;;
-                "8.0") [[ "$_zbx_dbver" -lt 7050033 ]] && _incompativel=1 ;;
+            "7.0") [[ "$_zbx_dbver" -lt 7000000 || "$_zbx_dbver" -ge 7040000 ]] && _incompativel=1 ;;
+            "7.4") [[ "$_zbx_dbver" -lt 7040000 || "$_zbx_dbver" -ge 7050033 ]] && _incompativel=1 ;;
+            "8.0") [[ "$_zbx_dbver" -lt 7050033 ]] && _incompativel=1 ;;
             esac
             local _zbx_schema_status
             if [[ "$_incompativel" == "0" ]]; then
@@ -4179,18 +4541,25 @@ EOF
         while true; do
             read -rp "   Escolha (1-4): " _compat_opt
             case "$_compat_opt" in
-                1) m_version; return 1 ;;
-                2) return 2 ;;
-                3)
-                   echo -e "\n  ${VERMELHO}${NEGRITO}Confirmação forte:${RESET} digite CONTINUAR para assumir o risco de schema incompatível."
-                   read -rp "   Confirmação: " _schema_force
-                   if [[ "$_schema_force" == "CONTINUAR" ]]; then
-                       echo -e "\n  ${AMARELO}⚠  A continuar. Resolva o conflito manualmente antes de aceder à interface web.${RESET}"
-                       return 3
-                   fi
-                   echo -e "   ${AMARELO}Confirmação não recebida. Voltando às opções.${RESET}" ;;
-                4) echo -e "${VERMELHO}Instalação abortada pelo utilizador.${RESET}"; exit 1 ;;
-                *) echo -e "   ${VERMELHO}Opção inválida.${RESET}" ;;
+            1)
+                m_version
+                return 1
+                ;;
+            2) return 2 ;;
+            3)
+                echo -e "\n  ${VERMELHO}${NEGRITO}Confirmação forte:${RESET} digite CONTINUAR para assumir o risco de schema incompatível."
+                read -rp "   Confirmação: " _schema_force
+                if [[ "$_schema_force" == "CONTINUAR" ]]; then
+                    echo -e "\n  ${AMARELO}⚠  A continuar. Resolva o conflito manualmente antes de aceder à interface web.${RESET}"
+                    return 3
+                fi
+                echo -e "   ${AMARELO}Confirmação não recebida. Voltando às opções.${RESET}"
+                ;;
+            4)
+                echo -e "${VERMELHO}Instalação abortada pelo utilizador.${RESET}"
+                exit 1
+                ;;
+            *) echo -e "   ${VERMELHO}Opção inválida.${RESET}" ;;
             esac
         done
     }
@@ -4207,20 +4576,26 @@ EOF
             echo -e "   ${VERMELHO}Campo obrigatório.${RESET}"
         done
         echo -e "\n${AMARELO}Porta PostgreSQL${RESET} (Padrão: 5432)"
-        read -rp "   Valor Recomendado [5432]: " DB_PORT; DB_PORT=${DB_PORT:-5432}
+        read -rp "   Valor Recomendado [5432]: " DB_PORT
+        DB_PORT=${DB_PORT:-5432}
         validate_port "$DB_PORT"
         echo -e "\n${AMARELO}Nome da Base de Dados${RESET} (Padrão: zabbix)"
-        read -rp "   Valor Recomendado [zabbix]: " DB_NAME; DB_NAME=${DB_NAME:-zabbix}
+        read -rp "   Valor Recomendado [zabbix]: " DB_NAME
+        DB_NAME=${DB_NAME:-zabbix}
         validate_identifier "$DB_NAME" "Nome da base de dados"
         echo -e "\n${AMARELO}Utilizador da Base de Dados${RESET}"
         while true; do
             read -rp "   Preencher (ex: zabbix ou zbx_f3a2b1c9): " DB_USER
-            [[ -n "$DB_USER" ]] && { validate_identifier "$DB_USER" "Utilizador da base de dados"; break; }
+            [[ -n "$DB_USER" ]] && {
+                validate_identifier "$DB_USER" "Utilizador da base de dados"
+                break
+            }
             echo -e "   ${VERMELHO}Campo obrigatório.${RESET}"
         done
         echo -e "\n${AMARELO}Senha do Utilizador${RESET} — obrigatório"
         while true; do
-            read -rsp "   Preencher: " DB_PASS; echo
+            read -rsp "   Preencher: " DB_PASS
+            echo
             [[ -n "$DB_PASS" ]] && break
             echo -e "   ${VERMELHO}Campo obrigatório.${RESET}"
         done
@@ -4244,7 +4619,10 @@ EOF
             echo -e "  ${AMARELO}  Verifique: listen_addresses inclui o IP desta máquina e pg_hba.conf autoriza este servidor${RESET}"
             local _retry_conn
             ask_yes_no "Corrigir e re-inserir as credenciais agora?" _retry_conn
-            if [[ "$_retry_conn" == "1" ]]; then m_dbconn; return; fi
+            if [[ "$_retry_conn" == "1" ]]; then
+                m_dbconn
+                return
+            fi
             echo -e "  ${AMARELO}⚠  A continuar sem confirmação de rede.${RESET}"
             return
         fi
@@ -4258,7 +4636,7 @@ EOF
             # Em LXC recém-criado o cache apt pode estar vazio — atualizar antes de instalar
             apt-get update -qq >/dev/null 2>&1 || true
             if apt-get install -y --no-install-recommends postgresql-client \
-                    >/dev/null 2>&1 && type -P psql >/dev/null 2>&1; then
+                >/dev/null 2>&1 && type -P psql >/dev/null 2>&1; then
                 _psql_cmd="psql"
                 echo -e "  ${VERDE}✔ Cliente psql instalado.${RESET}"
             else
@@ -4278,11 +4656,11 @@ EOF
             _pgpass_bak=$(mktemp)
             cp "$_pgpass_tmp" "$_pgpass_bak"
         fi
-        echo "${DB_HOST}:${DB_PORT}:*:${DB_USER}:${_pgpass_db_pass}" > "$_pgpass_tmp"
+        echo "${DB_HOST}:${DB_PORT}:*:${DB_USER}:${_pgpass_db_pass}" >"$_pgpass_tmp"
         chmod 0600 "$_pgpass_tmp"
 
         if ! psql -h "${DB_HOST}" -p "${DB_PORT}" \
-                -U "${DB_USER}" -d "${DB_NAME}" -c "SELECT 1;" >/dev/null 2>&1; then
+            -U "${DB_USER}" -d "${DB_NAME}" -c "SELECT 1;" >/dev/null 2>&1; then
             # Restaura pgpass antes de retry
             if [[ -n "$_pgpass_bak" && -f "$_pgpass_bak" ]]; then
                 mv "$_pgpass_bak" "$_pgpass_tmp"
@@ -4355,9 +4733,12 @@ EOF
             _show_compat_table "$_detected_tsdb" "$ZBX_DB_DETECTED"
             _compat_ret=$?
             case "$_compat_ret" in
-                0|3) break ;;           # compatível ou continuar mesmo assim
-                1)   ;;                 # versão Zabbix alterada → re-mostrar tabela com nova versão
-                2)   m_dbconn; return ;; # re-inserir credenciais
+            0 | 3) break ;; # compatível ou continuar mesmo assim
+            1) ;;           # versão Zabbix alterada → re-mostrar tabela com nova versão
+            2)
+                m_dbconn
+                return
+                ;; # re-inserir credenciais
             esac
         done
     }
@@ -4371,43 +4752,66 @@ EOF
         while true; do
             read -rp "   Escolha (1, 2 ou 3): " proto_opt
             case "$proto_opt" in
-                1) USE_HTTPS="0"; NGINX_PORT="80"; break ;;
-                2) USE_HTTPS="1"; NGINX_PORT="443"
-                   echo -e "\n   ${CIANO}${NEGRITO}Tipo de Certificado SSL:${RESET}"
-                   echo -e "   1) Auto-assinado (gerado agora, 10 anos)"
-                   echo -e "   2) Certificado existente (fornecer caminhos)"
-                   echo -e "   3) Configurar HTTPS sem certificado agora"
-                   while true; do
-                       read -rp "   Escolha (1, 2 ou 3): " ssl_opt
-                       case "$ssl_opt" in
-                           1) SSL_TYPE="self-signed"
-                              SSL_CERT="/etc/ssl/zabbix/zabbix.crt"
-                              SSL_KEY="/etc/ssl/zabbix/zabbix.key"
-                              break ;;
-                           2) SSL_TYPE="existing"
-                              while true; do read -rp "   Caminho do .crt: " SSL_CERT; [[ -n "$SSL_CERT" ]] && break; done
-                              while true; do read -rp "   Caminho do .key: " SSL_KEY;  [[ -n "$SSL_KEY"  ]] && break; done
-                              break ;;
-                           3) SSL_TYPE="later"
-                              SSL_CERT="/etc/ssl/zabbix/zabbix.crt"
-                              SSL_KEY="/etc/ssl/zabbix/zabbix.key"
-                              break ;;
-                           *) echo -e "   ${VERMELHO}Opção inválida.${RESET}" ;;
-                       esac
-                   done
-                   ask_yes_no "Ativar redirecionamento HTTP (80) → HTTPS (443)?" USE_HTTP_REDIRECT
-                   break ;;
-                3) USE_HTTPS="0"
-                   read -rp "   Porta personalizada [8080]: " NGINX_PORT; NGINX_PORT=${NGINX_PORT:-8080}
-                   validate_port "$NGINX_PORT"
-                   break ;;
-                *) echo -e "   ${VERMELHO}Opção inválida.${RESET}" ;;
+            1)
+                USE_HTTPS="0"
+                NGINX_PORT="80"
+                break
+                ;;
+            2)
+                USE_HTTPS="1"
+                NGINX_PORT="443"
+                echo -e "\n   ${CIANO}${NEGRITO}Tipo de Certificado SSL:${RESET}"
+                echo -e "   1) Auto-assinado (gerado agora, 10 anos)"
+                echo -e "   2) Certificado existente (fornecer caminhos)"
+                echo -e "   3) Configurar HTTPS sem certificado agora"
+                while true; do
+                    read -rp "   Escolha (1, 2 ou 3): " ssl_opt
+                    case "$ssl_opt" in
+                    1)
+                        SSL_TYPE="self-signed"
+                        SSL_CERT="/etc/ssl/zabbix/zabbix.crt"
+                        SSL_KEY="/etc/ssl/zabbix/zabbix.key"
+                        break
+                        ;;
+                    2)
+                        SSL_TYPE="existing"
+                        while true; do
+                            read -rp "   Caminho do .crt: " SSL_CERT
+                            [[ -n "$SSL_CERT" ]] && break
+                        done
+                        while true; do
+                            read -rp "   Caminho do .key: " SSL_KEY
+                            [[ -n "$SSL_KEY" ]] && break
+                        done
+                        break
+                        ;;
+                    3)
+                        SSL_TYPE="later"
+                        SSL_CERT="/etc/ssl/zabbix/zabbix.crt"
+                        SSL_KEY="/etc/ssl/zabbix/zabbix.key"
+                        break
+                        ;;
+                    *) echo -e "   ${VERMELHO}Opção inválida.${RESET}" ;;
+                    esac
+                done
+                ask_yes_no "Ativar redirecionamento HTTP (80) → HTTPS (443)?" USE_HTTP_REDIRECT
+                break
+                ;;
+            3)
+                USE_HTTPS="0"
+                read -rp "   Porta personalizada [8080]: " NGINX_PORT
+                NGINX_PORT=${NGINX_PORT:-8080}
+                validate_port "$NGINX_PORT"
+                break
+                ;;
+            *) echo -e "   ${VERMELHO}Opção inválida.${RESET}" ;;
             esac
         done
         echo -e "\n${AMARELO}Server Name (hostname/IP ou domínio do servidor)${RESET}"
         echo -e "   Deixe em branco para aceitar qualquer hostname (usa '_')."
         while true; do
-            read -rp "   Preencher [_]: " SERVER_NAME; SERVER_NAME=${SERVER_NAME:-_}
+            read -rp "   Preencher [_]: " SERVER_NAME
+            SERVER_NAME=${SERVER_NAME:-_}
             if [[ "$SERVER_NAME" == "_" || "$SERVER_NAME" =~ ^[a-zA-Z0-9._*-]+$ ]]; then
                 break
             fi
@@ -4426,34 +4830,51 @@ EOF
         echo -e "  ${AMARELO}4)${RESET} 128M — ambientes muito grandes com muitos templates"
         echo -e "  ${AMARELO}5)${RESET} Personalizado"
         while true; do
-            read -rp "   Escolha (1-5) [2]: " up_opt; up_opt=${up_opt:-2}
+            read -rp "   Escolha (1-5) [2]: " up_opt
+            up_opt=${up_opt:-2}
             case "$up_opt" in
-                1) PHP_UPLOAD_SIZE="16M";  break ;;
-                2) PHP_UPLOAD_SIZE="32M";  break ;;
-                3) PHP_UPLOAD_SIZE="64M";  break ;;
-                4) PHP_UPLOAD_SIZE="128M"; break ;;
-                5) while true; do
-                       read -rp "   Tamanho personalizado (ex: 256M): " PHP_UPLOAD_SIZE
-                       [[ "$PHP_UPLOAD_SIZE" =~ ^[0-9]+[MmGg]$ ]] && break
-                       echo -e "   ${VERMELHO}Formato inválido. Use ex: 64M ou 1G${RESET}"
-                   done; break ;;
-                *) echo -e "   ${VERMELHO}Opção inválida.${RESET}" ;;
+            1)
+                PHP_UPLOAD_SIZE="16M"
+                break
+                ;;
+            2)
+                PHP_UPLOAD_SIZE="32M"
+                break
+                ;;
+            3)
+                PHP_UPLOAD_SIZE="64M"
+                break
+                ;;
+            4)
+                PHP_UPLOAD_SIZE="128M"
+                break
+                ;;
+            5)
+                while true; do
+                    read -rp "   Tamanho personalizado (ex: 256M): " PHP_UPLOAD_SIZE
+                    [[ "$PHP_UPLOAD_SIZE" =~ ^[0-9]+[MmGg]$ ]] && break
+                    echo -e "   ${VERMELHO}Formato inválido. Use ex: 64M ou 1G${RESET}"
+                done
+                break
+                ;;
+            *) echo -e "   ${VERMELHO}Opção inválida.${RESET}" ;;
             esac
         done
         validate_size "$PHP_UPLOAD_SIZE" "PHP upload_max_filesize"
         echo -e "   ${VERDE}Upload máximo definido: ${NEGRITO}${PHP_UPLOAD_SIZE}${RESET}"
     }
 
-
     m_agent() {
         echo -e "\n${CIANO}${NEGRITO}>>> ZABBIX AGENT 2 (nesta máquina Server) <<<${RESET}"
         ask_yes_no "Instalar e configurar o Zabbix Agent 2 neste host?" INSTALL_AGENT
         if [[ "$INSTALL_AGENT" == "1" ]]; then
             echo -e "\n${AMARELO}Server${RESET} (Escuta Passiva)"
-            read -rp "   Valor Recomendado [127.0.0.1]: " AG_SERVER; AG_SERVER=${AG_SERVER:-127.0.0.1}
+            read -rp "   Valor Recomendado [127.0.0.1]: " AG_SERVER
+            AG_SERVER=${AG_SERVER:-127.0.0.1}
             validate_zabbix_identity "$AG_SERVER" "Server do Agente"
             echo -e "\n${AMARELO}ServerActive${RESET} (Envio Ativo)"
-            read -rp "   Valor Recomendado [127.0.0.1]: " AG_SERVER_ACTIVE; AG_SERVER_ACTIVE=${AG_SERVER_ACTIVE:-127.0.0.1}
+            read -rp "   Valor Recomendado [127.0.0.1]: " AG_SERVER_ACTIVE
+            AG_SERVER_ACTIVE=${AG_SERVER_ACTIVE:-127.0.0.1}
             validate_zabbix_identity "$AG_SERVER_ACTIVE" "ServerActive do Agente"
             echo -e "\n${AMARELO}Hostname do Agente${RESET} (Identificação única)"
             while true; do
@@ -4491,95 +4912,118 @@ EOF
 
             echo -e "${AMARELO}1. CacheSize${RESET} (Limites: 128K–64G | Padrão: 32M)"
             echo -e "   Memória partilhada para configurações de hosts, itens e triggers."
-            read -rp "   Valor Recomendado [${T_CACHE}]: " _v; T_CACHE=${_v:-$T_CACHE}
+            read -rp "   Valor Recomendado [${T_CACHE}]: " _v
+            T_CACHE=${_v:-$T_CACHE}
 
             echo -e "\n${AMARELO}2. HistoryCacheSize${RESET} (Limites: 128K–2G | Padrão: 16M)"
             echo -e "   Cache de métricas recentes antes de escrever na BD. Crítico para alto throughput."
-            read -rp "   Valor Recomendado [${T_HCACHE}]: " _v; T_HCACHE=${_v:-$T_HCACHE}
+            read -rp "   Valor Recomendado [${T_HCACHE}]: " _v
+            T_HCACHE=${_v:-$T_HCACHE}
 
             echo -e "\n${AMARELO}3. HistoryIndexCacheSize${RESET} (Limites: 128K–2G | Padrão: 4M)"
             echo -e "   Índice da cache de histórico — acelera pesquisas de valores."
-            read -rp "   Valor Recomendado [32M]: " T_HICACHE; T_HICACHE=${T_HICACHE:-32M}
+            read -rp "   Valor Recomendado [32M]: " T_HICACHE
+            T_HICACHE=${T_HICACHE:-32M}
 
             echo -e "\n${AMARELO}4. ValueCacheSize${RESET} (Limites: 0–64G | Padrão: 8M)"
             echo -e "   Cache de valores históricos para cálculo de funções e avaliação de triggers."
-            read -rp "   Valor Recomendado [${T_VCACHE}]: " _v; T_VCACHE=${_v:-$T_VCACHE}
+            read -rp "   Valor Recomendado [${T_VCACHE}]: " _v
+            T_VCACHE=${_v:-$T_VCACHE}
 
             echo -e "\n${AMARELO}5. TrendCacheSize${RESET} (Limites: 128K–2G | Padrão: 4M)"
             echo -e "   Cache de dados de tendência (min/max/avg por hora)."
-            read -rp "   Valor Recomendado [${T_TRCACHE}]: " _v; T_TRCACHE=${_v:-$T_TRCACHE}
+            read -rp "   Valor Recomendado [${T_TRCACHE}]: " _v
+            T_TRCACHE=${_v:-$T_TRCACHE}
 
             echo -e "\n${AMARELO}6. StartPollers${RESET} (Limites: 0–1000 | Padrão: 5)"
             echo -e "   Coletores passivos genéricos (Agent 1, SNMP, scripts)."
-            read -rp "   Valor Recomendado [${T_POLL}]: " _v; T_POLL=${_v:-$T_POLL}
+            read -rp "   Valor Recomendado [${T_POLL}]: " _v
+            T_POLL=${_v:-$T_POLL}
 
             echo -e "\n${AMARELO}7. StartPollersUnreachable${RESET} (Limites: 0–1000 | Padrão: 1)"
             echo -e "   Coletores dedicados a hosts em estado 'caído', sem bloquear os saudáveis."
-            read -rp "   Valor Recomendado [5]: " T_PUNREACH; T_PUNREACH=${T_PUNREACH:-5}
+            read -rp "   Valor Recomendado [5]: " T_PUNREACH
+            T_PUNREACH=${T_PUNREACH:-5}
 
             echo -e "\n${AMARELO}8. StartTrappers${RESET} (Limites: 0–1000 | Padrão: 5)"
             echo -e "   Processos que recebem dados de Agentes Ativos e Zabbix Sender."
-            read -rp "   Valor Recomendado [10]: " T_TRAP; T_TRAP=${T_TRAP:-10}
+            read -rp "   Valor Recomendado [10]: " T_TRAP
+            T_TRAP=${T_TRAP:-10}
 
             echo -e "\n${AMARELO}9. StartPreprocessors${RESET} (Limites: 1–1000 | Padrão: 3)"
             echo -e "   Threads para converter e processar dados brutos antes da cache."
-            read -rp "   Valor Recomendado [${T_PREPROC}]: " _v; T_PREPROC=${_v:-$T_PREPROC}
+            read -rp "   Valor Recomendado [${T_PREPROC}]: " _v
+            T_PREPROC=${_v:-$T_PREPROC}
 
             echo -e "\n${AMARELO}10. StartDBSyncers${RESET} (Limites: 1–100 | Padrão: 4)"
             echo -e "   Sincronizadores da cache de memória para a Base de Dados."
-            read -rp "   Valor Recomendado [${T_DBSYNC}]: " _v; T_DBSYNC=${_v:-$T_DBSYNC}
+            read -rp "   Valor Recomendado [${T_DBSYNC}]: " _v
+            T_DBSYNC=${_v:-$T_DBSYNC}
 
             echo -e "\n${AMARELO}11. StartPingers${RESET} (Limites: 0–1000 | Padrão: 1)"
             echo -e "   Processos exclusivos para testes de ICMP (ping)."
-            read -rp "   Valor Recomendado [5]: " T_PING; T_PING=${T_PING:-5}
+            read -rp "   Valor Recomendado [5]: " T_PING
+            T_PING=${T_PING:-5}
 
             echo -e "\n${AMARELO}12. StartDiscoverers${RESET} (Limites: 0–250 | Padrão: 5)"
             echo -e "   Processos de descoberta de rede (Network Discovery)."
-            read -rp "   Valor Recomendado [5]: " T_DISC; T_DISC=${T_DISC:-5}
+            read -rp "   Valor Recomendado [5]: " T_DISC
+            T_DISC=${T_DISC:-5}
 
             echo -e "\n${AMARELO}13. StartHTTPPollers${RESET} (Limites: 0–1000 | Padrão: 1)"
             echo -e "   Processos para testes de cenários Web HTTP."
-            read -rp "   Valor Recomendado [5]: " T_HTTP; T_HTTP=${T_HTTP:-5}
+            read -rp "   Valor Recomendado [5]: " T_HTTP
+            T_HTTP=${T_HTTP:-5}
 
             echo -e "\n${AMARELO}14. StartAgentPollers${RESET} (Limites: 0–1000 | Padrão: 1)"
             echo -e "   Coletores assíncronos de alta concorrência para Zabbix Agent 2."
-            read -rp "   Valor Recomendado [1]: " T_APOLL; T_APOLL=${T_APOLL:-1}
+            read -rp "   Valor Recomendado [1]: " T_APOLL
+            T_APOLL=${T_APOLL:-1}
 
             echo -e "\n${AMARELO}15. StartHTTPAgentPollers${RESET} (Limites: 0–1000 | Padrão: 1)"
             echo -e "   Coletores assíncronos de alta concorrência para o HTTP Agent."
-            read -rp "   Valor Recomendado [1]: " T_HAPOLL; T_HAPOLL=${T_HAPOLL:-1}
+            read -rp "   Valor Recomendado [1]: " T_HAPOLL
+            T_HAPOLL=${T_HAPOLL:-1}
 
             echo -e "\n${AMARELO}16. StartSNMPPollers${RESET} (Limites: 0–1000 | Padrão: 1)"
             echo -e "   Coletores assíncronos dedicados a queries SNMP de alta eficiência."
-            read -rp "   Valor Recomendado [10]: " T_SPOLL; T_SPOLL=${T_SPOLL:-10}
+            read -rp "   Valor Recomendado [10]: " T_SPOLL
+            T_SPOLL=${T_SPOLL:-10}
 
             echo -e "\n${AMARELO}17. StartBrowserPollers${RESET} (Limites: 0–1000 | Padrão: 1)"
             echo -e "   Coletores para itens de monitorização via Browser (Zabbix 7.0+)."
-            read -rp "   Valor Recomendado [1]: " T_BPOLL; T_BPOLL=${T_BPOLL:-1}
+            read -rp "   Valor Recomendado [1]: " T_BPOLL
+            T_BPOLL=${T_BPOLL:-1}
 
             echo -e "\n${AMARELO}18. StartODBCPollers${RESET} (Limites: 0–1000 | Padrão: 1)"
             echo -e "   Coletores para itens de BD via ODBC (DB Monitor)."
-            read -rp "   Valor Recomendado [1]: " T_ODBCPOLL; T_ODBCPOLL=${T_ODBCPOLL:-1}
+            read -rp "   Valor Recomendado [1]: " T_ODBCPOLL
+            T_ODBCPOLL=${T_ODBCPOLL:-1}
 
             echo -e "\n${AMARELO}19. MaxConcurrentChecksPerPoller${RESET} (Limites: 1–1000 | Padrão: 1000)"
             echo -e "   Métricas que um único poller assíncrono processa por ciclo."
-            read -rp "   Valor Recomendado [1000]: " T_MAXC; T_MAXC=${T_MAXC:-1000}
+            read -rp "   Valor Recomendado [1000]: " T_MAXC
+            T_MAXC=${T_MAXC:-1000}
 
             echo -e "\n${AMARELO}20. UnreachablePeriod${RESET} (Limites: 1–3600 | Padrão: 45)"
             echo -e "   Segundos sem resposta até o host ser considerado incontactável."
-            read -rp "   Valor Recomendado [45]: " T_UNREACH; T_UNREACH=${T_UNREACH:-45}
+            read -rp "   Valor Recomendado [45]: " T_UNREACH
+            T_UNREACH=${T_UNREACH:-45}
 
             echo -e "\n${AMARELO}21. Timeout${RESET} (Limites: 1–30 | Padrão: 3 segundos)"
             echo -e "   Tempo máximo de espera por resposta de agentes/rede."
-            read -rp "   Valor Recomendado [5]: " T_TOUT; T_TOUT=${T_TOUT:-5}
+            read -rp "   Valor Recomendado [5]: " T_TOUT
+            T_TOUT=${T_TOUT:-5}
 
             echo -e "\n${AMARELO}22. HousekeepingFrequency${RESET} (Limites: 0–24 horas | Padrão: 1)"
             echo -e "   Frequência (horas) da limpeza automática de dados antigos. 0=desativado."
-            read -rp "   Valor Recomendado [1]: " T_HK; T_HK=${T_HK:-1}
+            read -rp "   Valor Recomendado [1]: " T_HK
+            T_HK=${T_HK:-1}
 
             echo -e "\n${AMARELO}23. LogSlowQueries${RESET} (Padrão: 0=desativado | em milissegundos)"
             echo -e "   Regista queries lentas à BD no log do Server. Útil para diagnóstico."
-            read -rp "   Valor Recomendado [3000]: " T_SLOWQ; T_SLOWQ=${T_SLOWQ:-3000}
+            read -rp "   Valor Recomendado [3000]: " T_SLOWQ
+            T_SLOWQ=${T_SLOWQ:-3000}
             validate_size "$T_CACHE" "CacheSize"
             validate_size "$T_HCACHE" "HistoryCacheSize"
             validate_size "$T_HICACHE" "HistoryIndexCacheSize"
@@ -4611,8 +5055,15 @@ EOF
         echo -e "   ${VERDE}Fuso configurado: ${NEGRITO}${TIMEZONE}${RESET}"
     }
 
-    m_clean; m_update; m_version; m_dbconn
-    m_nginx; m_agent; m_security; m_tuning; m_timezone
+    m_clean
+    m_update
+    m_version
+    m_dbconn
+    m_nginx
+    m_agent
+    m_security
+    m_tuning
+    m_timezone
 
     # Menu de revisão
     while true; do
@@ -4629,10 +5080,14 @@ EOF
         # Linha de schema Zabbix existente — mostra aviso vermelho se incompatível
         if [[ -n "$ZBX_DB_DETECTED" ]]; then
             _rev_schema_origem=""
-            if   [[ "$ZBX_DB_DETECTED" -ge 7050033 ]]; then _rev_schema_origem="8.0"
-            elif [[ "$ZBX_DB_DETECTED" -ge 7040000 ]]; then _rev_schema_origem="7.4"
-            elif [[ "$ZBX_DB_DETECTED" -ge 7000000 ]]; then _rev_schema_origem="7.0"
-            else                                            _rev_schema_origem="<7.0"
+            if [[ "$ZBX_DB_DETECTED" -ge 7050033 ]]; then
+                _rev_schema_origem="8.0"
+            elif [[ "$ZBX_DB_DETECTED" -ge 7040000 ]]; then
+                _rev_schema_origem="7.4"
+            elif [[ "$ZBX_DB_DETECTED" -ge 7000000 ]]; then
+                _rev_schema_origem="7.0"
+            else
+                _rev_schema_origem="<7.0"
             fi
             if [[ "$_rev_schema_origem" == "$ZBX_VERSION" ]]; then
                 echo -e "  ${AMARELO}8)${RESET}  Schema Zabbix BD:  ${VERDE}✔ ${ZBX_DB_DETECTED} (Zabbix ${_rev_schema_origem}) — compatível${RESET}"
@@ -4660,10 +5115,14 @@ EOF
         echo -e "${CIANO}------------------------------------------------------------${RESET}"
         read -rp "Insira o número da secção a alterar ou 0 para executar: " rev_opt
         case $rev_opt in
-            2) m_update ;; 3) m_version ;; 4|5|6|7|8) m_dbconn ;;
-            9|10|11) m_nginx ;; 12) m_agent ;; 13) m_security ;; 14|15) m_tuning ;;
-            16) m_timezone ;;
-            17) echo -e "${VERMELHO}Instalação abortada pelo utilizador.${RESET}"; exit 1 ;; 0) break ;;
+        2) m_update ;; 3) m_version ;; 4 | 5 | 6 | 7 | 8) m_dbconn ;;
+        9 | 10 | 11) m_nginx ;; 12) m_agent ;; 13) m_security ;; 14 | 15) m_tuning ;;
+        16) m_timezone ;;
+        17)
+            echo -e "${VERMELHO}Instalação abortada pelo utilizador.${RESET}"
+            exit 1
+            ;;
+        0) break ;;
         esac
     done
 
@@ -4672,16 +5131,17 @@ EOF
     validate_compatibility_matrix "server"
     echo -e "\n${CIANO}${NEGRITO}A processar pipeline... Não cancele a operação!${RESET}\n"
     preflight_install_check "server" 4096 2048
-    TOTAL_STEPS=26  # +1 para apt-mark hold
-    [[ "$CLEAN_INSTALL" == "1" ]]  && TOTAL_STEPS=$(( TOTAL_STEPS + 3 ))
-    [[ "$UPDATE_SYSTEM" == "1" ]]  && TOTAL_STEPS=$(( TOTAL_STEPS + 2 ))
-    [[ "$NEED_PHP_PPA"  == "1" ]]  && TOTAL_STEPS=$(( TOTAL_STEPS + 1 ))
-    [[ "$USE_TIMESCALE" == "1" ]]  && TOTAL_STEPS=$(( TOTAL_STEPS + 2 ))   # import + compressão
-    [[ "$USE_HTTPS" == "1" && "$SSL_TYPE" == "self-signed" ]] && TOTAL_STEPS=$(( TOTAL_STEPS + 1 ))
-    [[ "$INSTALL_AGENT" == "1" ]]  && TOTAL_STEPS=$(( TOTAL_STEPS + 2 ))
-    [[ "$USE_PSK" == "1" && "$INSTALL_AGENT" == "1" ]] && TOTAL_STEPS=$(( TOTAL_STEPS + 1 ))
-    _IS_CONTAINER=0; systemd-detect-virt -c -q 2>/dev/null && _IS_CONTAINER=1 || true
-    [[ "$_IS_CONTAINER" == "0" ]] && TOTAL_STEPS=$(( TOTAL_STEPS + 2 ))  # timedatectl + NTP
+    TOTAL_STEPS=26 # +1 para apt-mark hold
+    [[ "$CLEAN_INSTALL" == "1" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 3))
+    [[ "$UPDATE_SYSTEM" == "1" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 2))
+    [[ "$NEED_PHP_PPA" == "1" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 1))
+    [[ "$USE_TIMESCALE" == "1" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 2)) # import + compressão
+    [[ "$USE_HTTPS" == "1" && "$SSL_TYPE" == "self-signed" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 1))
+    [[ "$INSTALL_AGENT" == "1" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 2))
+    [[ "$USE_PSK" == "1" && "$INSTALL_AGENT" == "1" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 1))
+    _IS_CONTAINER=0
+    systemd-detect-virt -c -q 2>/dev/null && _IS_CONTAINER=1 || true
+    [[ "$_IS_CONTAINER" == "0" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 2)) # timedatectl + NTP
     [[ "$SIMULATE_MODE" == "1" ]] && echo -e "\n${CIANO}${NEGRITO}SIMULAÇÃO DO PIPELINE — SERVER${RESET}\n"
 
     if [[ "$CLEAN_INSTALL" == "1" ]]; then
@@ -4723,7 +5183,7 @@ EOF
     fi
     run_step "Instalando dependências base" install_server_base_deps
 
-    [[ "$NEED_PHP_PPA" == "1" && "$OS_FAMILY" == "ubuntu" ]] && \
+    [[ "$NEED_PHP_PPA" == "1" && "$OS_FAMILY" == "ubuntu" ]] &&
         run_step "Adicionando PPA ondrej/php (PHP ${PHP_VER} para Ubuntu ${U_VER})" \
             add-apt-repository -y ppa:ondrej/php
 
@@ -4733,7 +5193,7 @@ EOF
             https://www.postgresql.org/media/keys/ACCC4CF8.asc
         echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
 https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
-            > /etc/apt/sources.list.d/pgdg.list
+            >/etc/apt/sources.list.d/pgdg.list
     }
     run_step "Adicionando repositório PGDG (cliente psql)" setup_pgdg_repo
     run_step "Sincronizando repositórios" apt-get update
@@ -4825,7 +5285,7 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
             _PGPASS_BACKUP=$(mktemp)
             cp "$_PGPASS_FILE" "$_PGPASS_BACKUP"
         fi
-        echo "${DB_HOST}:${DB_PORT}:*:${DB_USER}:${_pgpass_db_pass}" > "$_PGPASS_FILE"
+        echo "${DB_HOST}:${DB_PORT}:*:${DB_USER}:${_pgpass_db_pass}" >"$_PGPASS_FILE"
         chmod 0600 "$_PGPASS_FILE"
         # Garante limpeza em qualquer saída (sucesso, erro ou Ctrl+C) sem sobrescrever outros traps EXIT
         restore_pgpass() {
@@ -4859,7 +5319,8 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
         ZBX_SQL_TSDB="/usr/share/zabbix-sql-scripts/postgresql/timescaledb.sql"
     else
         echo -e "${VERMELHO}${NEGRITO}ERRO CRÍTICO:${RESET} Ficheiro server.sql.gz não encontrado."
-        echo -e "  Verifique: dpkg -L zabbix-sql-scripts"; exit 1
+        echo -e "  Verifique: dpkg -L zabbix-sql-scripts"
+        exit 1
     fi
 
     import_schema() {
@@ -4869,7 +5330,7 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
             -U "${DB_USER}" -d "${DB_NAME}" \
             -tAc "SELECT to_regclass('public.dbversion');" 2>/dev/null | xargs || echo "")
         if [[ "$schema_completo" == "public.dbversion" || "$schema_completo" == "dbversion" ]]; then
-            echo "Schema Zabbix completo já presente (dbversion) — passo ignorado." >> "$LOG_FILE"
+            echo "Schema Zabbix completo já presente (dbversion) — passo ignorado." >>"$LOG_FILE"
             return 0
         fi
         zcat "${ZBX_SQL_SERVER}" | psql \
@@ -4889,13 +5350,17 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
 
     if [[ "$USE_TIMESCALE" == "1" ]]; then
         import_timescaledb() {
-            [[ ! -f "${ZBX_SQL_TSDB}" ]] && { echo "ERRO: ${ZBX_SQL_TSDB} não encontrado" >&2; return 1; }
+            [[ ! -f "${ZBX_SQL_TSDB}" ]] && {
+                echo "ERRO: ${ZBX_SQL_TSDB} não encontrado" >&2
+                return 1
+            }
             local hyper_count
             hyper_count=$(psql -h "${DB_HOST}" -p "${DB_PORT}" \
                 -U "${DB_USER}" -d "${DB_NAME}" \
                 -tAc "SELECT COUNT(*) FROM timescaledb_information.hypertables;" 2>/dev/null | xargs || echo "0")
             if [[ "${hyper_count:-0}" -gt 0 ]]; then
-                echo "Hipertabelas já presentes — passo ignorado." >> "$LOG_FILE"; return 0
+                echo "Hipertabelas já presentes — passo ignorado." >>"$LOG_FILE"
+                return 0
             fi
             cat "${ZBX_SQL_TSDB}" | psql \
                 -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}"
@@ -4910,8 +5375,9 @@ https://apt.postgresql.org/pub/repos/apt ${U_CODENAME}-pgdg main" \
             local _ok=0 _total=0
             _configure_one_tsdb_policy() {
                 local table="$1" interval="$2" result
-                result=$(psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" \
-                    -v ON_ERROR_STOP=1 -qAt <<SQL 2>> "$LOG_FILE" | tee -a "$LOG_FILE" | tail -n 1 || true
+                result=$(
+                    psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" \
+                        -v ON_ERROR_STOP=1 -qAt <<SQL 2>>"$LOG_FILE" | tee -a "$LOG_FILE" | tail -n 1 || true
 DO \$\$
 DECLARE
     policy_status text := 'skipped';
@@ -4941,12 +5407,12 @@ SQL
                 [[ "$result" == "applied" ]]
             }
             for _t in history history_uint history_str history_log history_text; do
-                _total=$((_total+1))
-                _configure_one_tsdb_policy "$_t" "7 days" && _ok=$((_ok+1)) || true
+                _total=$((_total + 1))
+                _configure_one_tsdb_policy "$_t" "7 days" && _ok=$((_ok + 1)) || true
             done
             for _t in trends trends_uint; do
-                _total=$((_total+1))
-                _configure_one_tsdb_policy "$_t" "1 day" && _ok=$((_ok+1)) || true
+                _total=$((_total + 1))
+                _configure_one_tsdb_policy "$_t" "1 day" && _ok=$((_ok + 1)) || true
             done
             if [[ "$_ok" -eq "$_total" ]]; then
                 echo -e "  ${VERDE}Políticas aplicadas: ${_ok}/${_total} tabelas (histórico ≥7d | tendências ≥1d)${RESET}"
@@ -4965,53 +5431,53 @@ SQL
         psql -h "${DB_HOST}" -p "${DB_PORT}" \
             -U "${DB_USER}" -d "${DB_NAME}" \
             -c "UPDATE users SET lang=${admin_lang_sql}, timezone=${timezone_sql} WHERE username='Admin';" \
-            >> "$LOG_FILE" 2>&1 || true
+            >>"$LOG_FILE" 2>&1 || true
 
     }
     run_step "Definindo idioma ${ZBX_FRONTEND_LANG:-en_US} e timezone ${TIMEZONE} (Admin)" set_default_language
 
     SV_F="/etc/zabbix/zabbix_server.conf"
     apply_server_config() {
-        set_config "$SV_F" "DBHost"     "${DB_HOST}"
-        set_config "$SV_F" "DBName"     "${DB_NAME}"
-        set_config "$SV_F" "DBUser"     "${DB_USER}"
+        set_config "$SV_F" "DBHost" "${DB_HOST}"
+        set_config "$SV_F" "DBName" "${DB_NAME}"
+        set_config "$SV_F" "DBUser" "${DB_USER}"
         set_config "$SV_F" "DBPassword" "${DB_PASS}"
-        set_config "$SV_F" "DBPort"     "${DB_PORT}"
-        set_config "$SV_F" "DBSocket"   ""
-        set_config "$SV_F" "StartPollers"       "$T_POLL"
+        set_config "$SV_F" "DBPort" "${DB_PORT}"
+        set_config "$SV_F" "DBSocket" ""
+        set_config "$SV_F" "StartPollers" "$T_POLL"
         set_config "$SV_F" "StartPreprocessors" "$T_PREPROC"
-        set_config "$SV_F" "CacheSize"          "$T_CACHE"
-        set_config "$SV_F" "ValueCacheSize"     "$T_VCACHE"
-        set_config "$SV_F" "HistoryCacheSize"   "$T_HCACHE"
-        set_config "$SV_F" "TrendCacheSize"     "$T_TRCACHE"
-        set_config "$SV_F" "StartDBSyncers"     "$T_DBSYNC"
+        set_config "$SV_F" "CacheSize" "$T_CACHE"
+        set_config "$SV_F" "ValueCacheSize" "$T_VCACHE"
+        set_config "$SV_F" "HistoryCacheSize" "$T_HCACHE"
+        set_config "$SV_F" "TrendCacheSize" "$T_TRCACHE"
+        set_config "$SV_F" "StartDBSyncers" "$T_DBSYNC"
         if [[ "$USE_TUNING" == "1" ]]; then
-            set_config "$SV_F" "HistoryIndexCacheSize"        "$T_HICACHE"
-            set_config "$SV_F" "StartPollersUnreachable"      "$T_PUNREACH"
-            set_config "$SV_F" "StartTrappers"                "$T_TRAP"
-            set_config "$SV_F" "StartPingers"                 "$T_PING"
-            set_config "$SV_F" "StartDiscoverers"             "$T_DISC"
-            set_config "$SV_F" "StartHTTPPollers"             "$T_HTTP"
-            set_config "$SV_F" "StartAgentPollers"            "$T_APOLL"
-            set_config "$SV_F" "StartHTTPAgentPollers"        "$T_HAPOLL"
-            set_config "$SV_F" "StartSNMPPollers"             "$T_SPOLL"
-            set_config "$SV_F" "StartBrowserPollers"          "$T_BPOLL"
-            set_config "$SV_F" "StartODBCPollers"             "$T_ODBCPOLL"
+            set_config "$SV_F" "HistoryIndexCacheSize" "$T_HICACHE"
+            set_config "$SV_F" "StartPollersUnreachable" "$T_PUNREACH"
+            set_config "$SV_F" "StartTrappers" "$T_TRAP"
+            set_config "$SV_F" "StartPingers" "$T_PING"
+            set_config "$SV_F" "StartDiscoverers" "$T_DISC"
+            set_config "$SV_F" "StartHTTPPollers" "$T_HTTP"
+            set_config "$SV_F" "StartAgentPollers" "$T_APOLL"
+            set_config "$SV_F" "StartHTTPAgentPollers" "$T_HAPOLL"
+            set_config "$SV_F" "StartSNMPPollers" "$T_SPOLL"
+            set_config "$SV_F" "StartBrowserPollers" "$T_BPOLL"
+            set_config "$SV_F" "StartODBCPollers" "$T_ODBCPOLL"
             set_config "$SV_F" "MaxConcurrentChecksPerPoller" "$T_MAXC"
-            set_config "$SV_F" "UnreachablePeriod"            "$T_UNREACH"
-            set_config "$SV_F" "Timeout"                      "$T_TOUT"
-            set_config "$SV_F" "HousekeepingFrequency"        "$T_HK"
-            set_config "$SV_F" "LogSlowQueries"               "$T_SLOWQ"
+            set_config "$SV_F" "UnreachablePeriod" "$T_UNREACH"
+            set_config "$SV_F" "Timeout" "$T_TOUT"
+            set_config "$SV_F" "HousekeepingFrequency" "$T_HK"
+            set_config "$SV_F" "LogSlowQueries" "$T_SLOWQ"
         fi
     }
     run_step "Configurando zabbix_server.conf (BD + tuning)" apply_server_config
 
     AG_F="/etc/zabbix/zabbix_agent2.conf"
-    if [[ "$INSTALL_AGENT" == "1" && ( -f "$AG_F" || "$SIMULATE_MODE" == "1" ) ]]; then
+    if [[ "$INSTALL_AGENT" == "1" && (-f "$AG_F" || "$SIMULATE_MODE" == "1") ]]; then
         apply_agent_config() {
-            set_config "$AG_F" "Server"       "$AG_SERVER"
+            set_config "$AG_F" "Server" "$AG_SERVER"
             set_config "$AG_F" "ServerActive" "$AG_SERVER_ACTIVE"
-            set_config "$AG_F" "Hostname"     "$AG_HOSTNAME"
+            set_config "$AG_F" "Hostname" "$AG_HOSTNAME"
             [[ "$AG_ALLOWKEY" == "1" ]] && set_config "$AG_F" "AllowKey" "system.run[*]"
         }
         run_step "Configurando Zabbix Agent 2" apply_agent_config
@@ -5024,13 +5490,13 @@ SQL
             PSK_AGENT_KEY=$(openssl rand -hex 32)
         fi
         apply_psk_agent() {
-            echo "$PSK_AGENT_KEY" > /etc/zabbix/zabbix_agent2.psk
+            echo "$PSK_AGENT_KEY" >/etc/zabbix/zabbix_agent2.psk
             chown zabbix:zabbix /etc/zabbix/zabbix_agent2.psk
             chmod 600 /etc/zabbix/zabbix_agent2.psk
-            set_config "$AG_F" "TLSAccept"      "psk"
-            set_config "$AG_F" "TLSConnect"     "psk"
+            set_config "$AG_F" "TLSAccept" "psk"
+            set_config "$AG_F" "TLSConnect" "psk"
             set_config "$AG_F" "TLSPSKIdentity" "$PSK_AGENT_ID"
-            set_config "$AG_F" "TLSPSKFile"     "/etc/zabbix/zabbix_agent2.psk"
+            set_config "$AG_F" "TLSPSKFile" "/etc/zabbix/zabbix_agent2.psk"
         }
         run_step "Gerando e aplicando chave PSK do Agente" apply_psk_agent
     fi
@@ -5040,7 +5506,7 @@ SQL
         if [[ "$USE_HTTPS" == "1" ]]; then
             sed -i "s|#\s*listen\s\+[0-9]\+;|        listen          ${NGINX_PORT} ssl;|g" "$NX_F"
             sed -i "s|^\s*listen\s\+[0-9]\+;|        listen          ${NGINX_PORT} ssl;|g" "$NX_F"
-            SSL_CERT_VAR="${SSL_CERT}" SSL_KEY_VAR="${SSL_KEY}" NX_F_VAR="${NX_F}" python3 << 'PYEOF'
+            SSL_CERT_VAR="${SSL_CERT}" SSL_KEY_VAR="${SSL_KEY}" NX_F_VAR="${NX_F}" python3 <<'PYEOF'
 import re, os
 nxf=os.environ['NX_F_VAR']; cert=os.environ['SSL_CERT_VAR']; key=os.environ['SSL_KEY_VAR']
 with open(nxf) as f: c=f.read()
@@ -5054,7 +5520,7 @@ if 'ssl_certificate' not in c:
 PYEOF
             if [[ "$USE_HTTP_REDIRECT" == "1" ]]; then
                 mkdir -p /etc/nginx/conf.d
-                cat > /etc/nginx/conf.d/zabbix-http-redirect.conf << EOF
+                cat >/etc/nginx/conf.d/zabbix-http-redirect.conf <<EOF
 server {
     listen 80;
     server_name ${SERVER_NAME};
@@ -5089,45 +5555,45 @@ EOF
         if grep -qE "^;?\s*php_value\[date\.timezone\]" "$PHP_FPM_CONF" 2>/dev/null; then
             sed -i "s|^;*\s*php_value\[date\.timezone\].*|php_value[date.timezone] = ${TIMEZONE}|g" "$PHP_FPM_CONF"
         else
-            echo "php_value[date.timezone] = ${TIMEZONE}" >> "$PHP_FPM_CONF"
+            echo "php_value[date.timezone] = ${TIMEZONE}" >>"$PHP_FPM_CONF"
         fi
 
         # Memória: 256M (padrão PHP 128M é insuficiente para Zabbix)
         sed -i "s|php_value\[memory_limit\].*|php_value[memory_limit] = 256M|g" \
-            "$PHP_FPM_CONF" 2>/dev/null || \
-            echo "php_value[memory_limit] = 256M" >> "$PHP_FPM_CONF"
+            "$PHP_FPM_CONF" 2>/dev/null ||
+            echo "php_value[memory_limit] = 256M" >>"$PHP_FPM_CONF"
 
         # Tempo máximo de execução: 300s (importações pesadas podem demorar)
         sed -i "s|php_value\[max_execution_time\].*|php_value[max_execution_time] = 300|g" \
-            "$PHP_FPM_CONF" 2>/dev/null || \
-            echo "php_value[max_execution_time] = 300" >> "$PHP_FPM_CONF"
+            "$PHP_FPM_CONF" 2>/dev/null ||
+            echo "php_value[max_execution_time] = 300" >>"$PHP_FPM_CONF"
 
         # Tempo máximo de leitura do input
         sed -i "s|php_value\[max_input_time\].*|php_value[max_input_time] = 300|g" \
-            "$PHP_FPM_CONF" 2>/dev/null || \
-            echo "php_value[max_input_time] = 300" >> "$PHP_FPM_CONF"
+            "$PHP_FPM_CONF" 2>/dev/null ||
+            echo "php_value[max_input_time] = 300" >>"$PHP_FPM_CONF"
 
         # Upload: valor escolhido pelo utilizador (templates, iconsets, mapas)
         sed -i "s|php_value\[upload_max_filesize\].*|php_value[upload_max_filesize] = ${PHP_UPLOAD_SIZE}|g" \
-            "$PHP_FPM_CONF" 2>/dev/null || \
-            echo "php_value[upload_max_filesize] = ${PHP_UPLOAD_SIZE}" >> "$PHP_FPM_CONF"
+            "$PHP_FPM_CONF" 2>/dev/null ||
+            echo "php_value[upload_max_filesize] = ${PHP_UPLOAD_SIZE}" >>"$PHP_FPM_CONF"
 
         # post_max_size deve ser >= upload_max_filesize (usar o mesmo valor é seguro)
         sed -i "s|php_value\[post_max_size\].*|php_value[post_max_size] = ${PHP_UPLOAD_SIZE}|g" \
-            "$PHP_FPM_CONF" 2>/dev/null || \
-            echo "php_value[post_max_size] = ${PHP_UPLOAD_SIZE}" >> "$PHP_FPM_CONF"
+            "$PHP_FPM_CONF" 2>/dev/null ||
+            echo "php_value[post_max_size] = ${PHP_UPLOAD_SIZE}" >>"$PHP_FPM_CONF"
 
         # pm.max_children: calculado com base na RAM disponível (~50MB por worker PHP)
-        local php_workers=$(( RAM_MB / 50 ))
-        (( php_workers <  10 )) && php_workers=10
-        (( php_workers > 100 )) && php_workers=100
+        local php_workers=$((RAM_MB / 50))
+        ((php_workers < 10)) && php_workers=10
+        ((php_workers > 100)) && php_workers=100
         sed -i "s|^pm\.max_children\s*=.*|pm.max_children = ${php_workers}|g" \
             "$PHP_FPM_CONF" 2>/dev/null || true
 
         # pm.max_requests: limita vazamentos de memória reiniciando workers periodicamente
         sed -i "s|^pm\.max_requests\s*=.*|pm.max_requests = 200|g" \
-            "$PHP_FPM_CONF" 2>/dev/null || \
-            echo "pm.max_requests = 200" >> "$PHP_FPM_CONF"
+            "$PHP_FPM_CONF" 2>/dev/null ||
+            echo "pm.max_requests = 200" >>"$PHP_FPM_CONF"
     }
     run_step "Configurando PHP ${PHP_VER}-FPM (timezone, memória, upload ${PHP_UPLOAD_SIZE}, workers)" configure_phpfpm
 
@@ -5140,7 +5606,7 @@ EOF
         DB_HOST_PHP=$(php_single_quote_escape "$DB_HOST")
         DB_PORT_PHP=$(php_single_quote_escape "$DB_PORT")
         SERVER_NAME_PHP=$(php_single_quote_escape "$SERVER_NAME")
-        cat > /etc/zabbix/web/zabbix.conf.php << ZCONF
+        cat >/etc/zabbix/web/zabbix.conf.php <<ZCONF
 <?php
 // Zabbix GUI configuration file — gerado por AUTOMACAO-ZBX-UNIFIED ${INSTALLER_LABEL}
 global \$DB;
@@ -5152,12 +5618,11 @@ global \$DB;
 \$ZBX_SERVER='localhost'; \$ZBX_SERVER_PORT='10051'; \$ZBX_SERVER_NAME='${SERVER_NAME_PHP}';
 \$IMAGE_FORMAT_DEFAULT=IMAGE_FORMAT_PNG;
 ZCONF
-        chown www-data:www-data /etc/zabbix/web/zabbix.conf.php 2>/dev/null || \
+        chown www-data:www-data /etc/zabbix/web/zabbix.conf.php 2>/dev/null ||
             chown nginx:nginx /etc/zabbix/web/zabbix.conf.php 2>/dev/null || true
         chmod 640 /etc/zabbix/web/zabbix.conf.php
     }
     run_step "Pré-configurando frontend Zabbix (eliminando wizard do browser)" preconfigure_frontend
-
 
     start_services() {
         systemctl enable --now zabbix-server nginx "php${PHP_VER}-fpm"
@@ -5181,7 +5646,7 @@ ZCONF
 
     configure_logrotate() {
         # Rotação semanal dos logs do Zabbix — evita crescimento ilimitado
-        cat > /etc/logrotate.d/zabbix << 'LOGEOF'
+        cat >/etc/logrotate.d/zabbix <<'LOGEOF'
 /var/log/zabbix/*.log {
     weekly
     rotate 12
@@ -5213,24 +5678,29 @@ LOGEOF
     [[ "$SIMULATE_MODE" == "1" ]] && finish_simulation
     post_validate_installation "server"
     if [[ "$_CRITICAL_SERVICES_OK" == "1" ]]; then
-        CURRENT_STEP=$TOTAL_STEPS; draw_progress "Instalação Perfeita! ✔"; printf "\n"
+        CURRENT_STEP=$TOTAL_STEPS
+        draw_progress "Instalação Perfeita! ✔"
+        printf "\n"
     else
-        CURRENT_STEP=$TOTAL_STEPS; draw_progress "Instalação com Avisos ⚠"; printf "\n"
+        CURRENT_STEP=$TOTAL_STEPS
+        draw_progress "Instalação com Avisos ⚠"
+        printf "\n"
     fi
 
     # Certificado
     clear
     start_certificate_export "server"
-    [[ "$_CRITICAL_SERVICES_OK" != "1" ]] && \
+    [[ "$_CRITICAL_SERVICES_OK" != "1" ]] &&
         echo -e "${VERMELHO}${NEGRITO}⚠ UM OU MAIS SERVIÇOS CRÍTICOS NÃO ESTÃO ATIVOS. Verifique acima e execute: journalctl -xe --no-pager${RESET}\n"
     HOST_IP=$(hostname -I | awk '{print $1}')
-    SV_RAM=$(free -m | awk '/^Mem/{print $2}'); SV_CORES=$(nproc)
+    SV_RAM=$(free -m | awk '/^Mem/{print $2}')
+    SV_CORES=$(nproc)
     echo -e "${VERDE}${NEGRITO}╔══════════════════════════════════════════════════════════╗${RESET}"
     echo -e "${VERDE}${NEGRITO}║           CERTIFICADO — CAMADA DE SERVIDOR               ║${RESET}"
     echo -e "${VERDE}${NEGRITO}╚══════════════════════════════════════════════════════════╝${RESET}"
     echo -e "\n${CIANO}${NEGRITO}▸ SISTEMA OPERACIONAL + HARDWARE${RESET}"
-    command -v lsb_release >/dev/null 2>&1 && \
-        printf "  %-34s %s\n" "Distribuição:" "$(lsb_release -ds)" || \
+    command -v lsb_release >/dev/null 2>&1 &&
+        printf "  %-34s %s\n" "Distribuição:" "$(lsb_release -ds)" ||
         printf "  %-34s %s\n" "Sistema:" "$OS_DISPLAY"
     printf "  %-34s %s\n" "Kernel:" "$(uname -r)"
     printf "  %-34s %s\n" "RAM total:" "${SV_RAM} MB"
@@ -5242,9 +5712,9 @@ LOGEOF
     printf "  %-34s %s\n" "postgresql-client-${PG_VER}:" "$(package_version_or_na "postgresql-client-${PG_VER}")"
     [[ "$INSTALL_AGENT" == "1" ]] && printf "  %-34s %s\n" "zabbix-agent2:" "$(package_version_or_na zabbix-agent2)"
     echo -e "\n${CIANO}${NEGRITO}▸ ACESSO AO FRONTEND${RESET}"
-    [[ "$USE_HTTPS" == "1" ]] && printf "  %-34s ${VERDE}%s${RESET}\n" "URL de Acesso:" "https://${HOST_IP}:${NGINX_PORT}" || \
-                                  printf "  %-34s ${VERDE}%s${RESET}\n" "URL de Acesso:" "http://${HOST_IP}:${NGINX_PORT}"
-    printf "  %-34s %s\n"           "Utilizador padrão:" "Admin"
+    [[ "$USE_HTTPS" == "1" ]] && printf "  %-34s ${VERDE}%s${RESET}\n" "URL de Acesso:" "https://${HOST_IP}:${NGINX_PORT}" ||
+        printf "  %-34s ${VERDE}%s${RESET}\n" "URL de Acesso:" "http://${HOST_IP}:${NGINX_PORT}"
+    printf "  %-34s %s\n" "Utilizador padrão:" "Admin"
     printf "  %-34s ${AMARELO}%s${RESET}\n" "Senha padrão:" "zabbix  ← ALTERE NO PRIMEIRO LOGIN!"
     FRONTEND_URL="http://${HOST_IP}:${NGINX_PORT}"
     [[ "$USE_HTTPS" == "1" ]] && FRONTEND_URL="https://${HOST_IP}:${NGINX_PORT}"
@@ -5257,10 +5727,10 @@ LOGEOF
     echo "  ------------------------------------------------------------"
     echo -e "\n${CIANO}${NEGRITO}▸ CREDENCIAIS DA BASE EM USO PELO SERVER${RESET}"
     echo "  ------------------------------------------------------------"
-    printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "DBHost:"     "$DB_HOST"
-    printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "DBPort:"     "$DB_PORT"
-    printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "DBName:"     "$DB_NAME"
-    printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "DBUser:"     "$DB_USER"
+    printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "DBHost:" "$DB_HOST"
+    printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "DBPort:" "$DB_PORT"
+    printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "DBName:" "$DB_NAME"
+    printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "DBUser:" "$DB_USER"
     printf "  ${NEGRITO}%-32s${RESET} ${VERMELHO}%s${RESET}\n" "DBPassword:" "$DB_PASS"
     echo "  ------------------------------------------------------------"
     echo -e "\n${CIANO}${NEGRITO}▸ ESTADO DOS SERVIÇOS${RESET}"
@@ -5272,16 +5742,16 @@ LOGEOF
             echo -e "  ${AMARELO}Diagnóstico:${RESET} journalctl -u ${svc} -n 30 --no-pager"
         fi
     done
-    [[ "$INSTALL_AGENT" == "1" ]] && systemctl is-active --quiet zabbix-agent2 2>/dev/null && \
+    [[ "$INSTALL_AGENT" == "1" ]] && systemctl is-active --quiet zabbix-agent2 2>/dev/null &&
         printf "  %-34s ${VERDE}%s${RESET}\n" "zabbix-agent2:" "ATIVO ✔"
     echo -e "\n${CIANO}${NEGRITO}▸ AUDITORIA: LINHAS ATIVAS NO SERVER.CONF${RESET}"
     timeout 10 awk '$0 !~ /^[[:space:]]*#/ && $0 !~ /^[[:space:]]*$/ { print "  " $0 }' "$SV_F" 2>/dev/null || true
     if [[ "$USE_PSK" == "1" && "$INSTALL_AGENT" == "1" ]]; then
         echo -e "\n${AMARELO}${NEGRITO}▸ CREDENCIAIS PSK — AGENT 2${RESET}"
         echo -e "  ------------------------------------------------------------"
-        printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "IP desta máquina:"  "$HOST_IP"
-        printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Hostname Agente:"   "$AG_HOSTNAME"
-        printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "PSK Identity:"      "$PSK_AGENT_ID"
+        printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "IP desta máquina:" "$HOST_IP"
+        printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Hostname Agente:" "$AG_HOSTNAME"
+        printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "PSK Identity:" "$PSK_AGENT_ID"
         printf "  ${NEGRITO}%-32s${RESET} ${VERMELHO}%s${RESET}\n" "PSK Secret Key:" "$PSK_AGENT_KEY"
         echo -e "  ------------------------------------------------------------"
     fi
@@ -5291,7 +5761,6 @@ LOGEOF
     print_support_commands "server"
     echo -e "\n${NEGRITO}Log completo:${RESET} $LOG_FILE\n"
     ;;
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # COMPONENTE 3 — PROXY (Zabbix Proxy + Agent 2) — Proxy v10.7
@@ -5307,53 +5776,92 @@ proxy)
     log_msg "INFO" "Log iniciado para componente Proxy em ${LOG_FILE}"
 
     # Variáveis de estado
-    T_UNREACH="45"; T_PING="5"; T_DISC="5"; T_HTTP="1"
-    T_PUNREACH="5"; T_TRAP="5"; T_APOLL="1"; T_HAPOLL="1"
-    T_SPOLL="10"; T_BPOLL="1"; T_ODBCPOLL="1"; T_MAXC="1000"; T_CFG_FREQ="10"; T_SND_FREQ="1"
-    T_OFFLINE="1"; T_BUF_MOD="hybrid"; T_BUF_SZ="16M"; T_BUF_AGE="0"
+    T_UNREACH="45"
+    T_PING="5"
+    T_DISC="5"
+    T_HTTP="1"
+    T_PUNREACH="5"
+    T_TRAP="5"
+    T_APOLL="1"
+    T_HAPOLL="1"
+    T_SPOLL="10"
+    T_BPOLL="1"
+    T_ODBCPOLL="1"
+    T_MAXC="1000"
+    T_CFG_FREQ="10"
+    T_SND_FREQ="1"
+    T_OFFLINE="1"
+    T_BUF_MOD="hybrid"
+    T_BUF_SZ="16M"
+    T_BUF_AGE="0"
     PROXY_PERF_PROFILE=""
-    CLEAN_INSTALL=0; UPDATE_SYSTEM=0; ZBX_VERSION="7.0"; PROXY_MODE="0"
+    CLEAN_INSTALL=0
+    UPDATE_SYSTEM=0
+    ZBX_VERSION="7.0"
+    PROXY_MODE="0"
     PROXY_TIMEZONE="${SYS_TIMEZONE:-America/Sao_Paulo}"
 
     clamp_int() {
         local value="$1" min="$2" max="$3"
-        (( value < min )) && value="$min"
-        (( value > max )) && value="$max"
+        ((value < min)) && value="$min"
+        ((value > max)) && value="$max"
         echo "$value"
     }
     calc_proxy_auto_performance() {
-        if (( RAM_MB < 4096 )); then
+        if ((RAM_MB < 4096)); then
             PROXY_PERF_PROFILE="mínimo"
-            T_CACHE="64M";  T_HCACHE="64M";  T_HICACHE="16M"; T_DBSYNC="2"
-            T_POLL=$(clamp_int $(( CPU_CORES * 2 )) 4 10)
-            T_PREPROC=$(clamp_int $(( CPU_CORES * 2 )) 4 8)
-        elif (( RAM_MB < 8192 )); then
+            T_CACHE="64M"
+            T_HCACHE="64M"
+            T_HICACHE="16M"
+            T_DBSYNC="2"
+            T_POLL=$(clamp_int $((CPU_CORES * 2)) 4 10)
+            T_PREPROC=$(clamp_int $((CPU_CORES * 2)) 4 8)
+        elif ((RAM_MB < 8192)); then
             PROXY_PERF_PROFILE="baixo"
-            T_CACHE="128M"; T_HCACHE="128M"; T_HICACHE="32M"; T_DBSYNC="2"
-            T_POLL=$(clamp_int $(( CPU_CORES * 3 )) 10 20)
-            T_PREPROC=$(clamp_int $(( CPU_CORES * 3 )) 8 16)
-        elif (( RAM_MB <= 16384 )); then
+            T_CACHE="128M"
+            T_HCACHE="128M"
+            T_HICACHE="32M"
+            T_DBSYNC="2"
+            T_POLL=$(clamp_int $((CPU_CORES * 3)) 10 20)
+            T_PREPROC=$(clamp_int $((CPU_CORES * 3)) 8 16)
+        elif ((RAM_MB <= 16384)); then
             PROXY_PERF_PROFILE="médio"
-            T_CACHE="256M"; T_HCACHE="256M"; T_HICACHE="64M"; T_DBSYNC="4"
-            T_POLL=$(clamp_int $(( CPU_CORES * 4 )) 20 40)
-            T_PREPROC=$(clamp_int $(( CPU_CORES * 4 )) 16 32)
+            T_CACHE="256M"
+            T_HCACHE="256M"
+            T_HICACHE="64M"
+            T_DBSYNC="4"
+            T_POLL=$(clamp_int $((CPU_CORES * 4)) 20 40)
+            T_PREPROC=$(clamp_int $((CPU_CORES * 4)) 16 32)
         else
             PROXY_PERF_PROFILE="alto"
-            T_CACHE="512M"; T_HCACHE="512M"; T_HICACHE="128M"; T_DBSYNC="8"
-            T_POLL=$(clamp_int $(( CPU_CORES * 5 )) 40 80)
-            T_PREPROC=$(clamp_int $(( CPU_CORES * 5 )) 32 64)
+            T_CACHE="512M"
+            T_HCACHE="512M"
+            T_HICACHE="128M"
+            T_DBSYNC="8"
+            T_POLL=$(clamp_int $((CPU_CORES * 5)) 40 80)
+            T_PREPROC=$(clamp_int $((CPU_CORES * 5)) 32 64)
         fi
     }
     calc_proxy_auto_performance
-    ZBX_SERVER=""; ZBX_HOSTNAME=""; INSTALL_AGENT="0"; ENABLE_REMOTE="0"
-    USE_PSK="0"; USE_TUNING="0"; PSK_PROXY_ID=""; PSK_AGENT_ID=""
-    PSK_PROXY_KEY=""; PSK_AGENT_KEY=""
-    AG_SERVER="127.0.0.1"; AG_SERVER_ACTIVE="127.0.0.1"; AG_HOSTNAME=""; AG_ALLOWKEY="0"
+    ZBX_SERVER=""
+    ZBX_HOSTNAME=""
+    INSTALL_AGENT="0"
+    ENABLE_REMOTE="0"
+    USE_PSK="0"
+    USE_TUNING="0"
+    PSK_PROXY_ID=""
+    PSK_AGENT_ID=""
+    PSK_PROXY_KEY=""
+    PSK_AGENT_KEY=""
+    AG_SERVER="127.0.0.1"
+    AG_SERVER_ACTIVE="127.0.0.1"
+    AG_HOSTNAME=""
+    AG_ALLOWKEY="0"
 
     # Banner Proxy
     clear
     echo -e "${VERMELHO}${NEGRITO}"
-    cat << "EOF"
+    cat <<"EOF"
 ██████╗ ██████╗  ██████╗ ██╗  ██╗██╗   ██╗
 ██╔══██╗██╔══██╗██╔═══██╗╚██╗██╔╝╚██╗ ██╔╝
 ██████╔╝██████╔╝██║   ██║ ╚███╔╝  ╚████╔╝
@@ -5393,10 +5901,19 @@ EOF
         while true; do
             read -rp "  Escolha (1, 2 ou 3): " v_opt
             case "$v_opt" in
-                1) ZBX_VERSION="7.0"; break ;;
-                2) ZBX_VERSION="7.4"; break ;;
-                3) ZBX_VERSION="8.0"; break ;;
-                *) echo -e "  ${VERMELHO}Opção inválida.${RESET}" ;;
+            1)
+                ZBX_VERSION="7.0"
+                break
+                ;;
+            2)
+                ZBX_VERSION="7.4"
+                break
+                ;;
+            3)
+                ZBX_VERSION="8.0"
+                break
+                ;;
+            *) echo -e "  ${VERMELHO}Opção inválida.${RESET}" ;;
             esac
         done
     }
@@ -5407,11 +5924,18 @@ EOF
         echo -e "   0 - Proxy no modo ATIVO (O Proxy conecta ao Server. Mais Recomendado)"
         echo -e "   1 - Proxy no modo PASSIVO (O Server conecta ao Proxy para buscar dados)"
         while true; do
-            read -rp "   Valor Recomendado [0]: " pm_opt; pm_opt=${pm_opt:-0}
+            read -rp "   Valor Recomendado [0]: " pm_opt
+            pm_opt=${pm_opt:-0}
             case "$pm_opt" in
-                0) PROXY_MODE="0"; break ;;
-                1) PROXY_MODE="1"; break ;;
-                *) echo -e "   ${VERMELHO}Opção inválida. Escolha 0 ou 1.${RESET}" ;;
+            0)
+                PROXY_MODE="0"
+                break
+                ;;
+            1)
+                PROXY_MODE="1"
+                break
+                ;;
+            *) echo -e "   ${VERMELHO}Opção inválida. Escolha 0 ou 1.${RESET}" ;;
             esac
         done
     }
@@ -5446,21 +5970,25 @@ EOF
             echo -e "\n${AMARELO}Server${RESET} (Escuta Passiva autorizada no Agent 2)"
             echo -e "   Em Proxy ativo, use o IP/DNS real do Zabbix Server, não localhost."
             while true; do
-                read -rp "   Valor Recomendado [${agent_default}]: " AG_SERVER; AG_SERVER=${AG_SERVER:-$agent_default}
+                read -rp "   Valor Recomendado [${agent_default}]: " AG_SERVER
+                AG_SERVER=${AG_SERVER:-$agent_default}
                 if [[ "$PROXY_MODE" == "0" ]]; then
                     validate_proxy_server_value "$AG_SERVER" "$PROXY_MODE" "Server do Agente" && break
                 else
-                    validate_zabbix_identity "$AG_SERVER" "Server do Agente"; break
+                    validate_zabbix_identity "$AG_SERVER" "Server do Agente"
+                    break
                 fi
             done
             echo -e "\n${AMARELO}ServerActive${RESET} (Envio Ativo do Agent 2)"
             echo -e "   Em Proxy ativo, use o IP/DNS real do Zabbix Server, não localhost."
             while true; do
-                read -rp "   Valor Recomendado [${agent_default}]: " AG_SERVER_ACTIVE; AG_SERVER_ACTIVE=${AG_SERVER_ACTIVE:-$agent_default}
+                read -rp "   Valor Recomendado [${agent_default}]: " AG_SERVER_ACTIVE
+                AG_SERVER_ACTIVE=${AG_SERVER_ACTIVE:-$agent_default}
                 if [[ "$PROXY_MODE" == "0" ]]; then
                     validate_proxy_server_value "$AG_SERVER_ACTIVE" "$PROXY_MODE" "ServerActive do Agente" && break
                 else
-                    validate_zabbix_identity "$AG_SERVER_ACTIVE" "ServerActive do Agente"; break
+                    validate_zabbix_identity "$AG_SERVER_ACTIVE" "ServerActive do Agente"
+                    break
                 fi
             done
             echo -e "\n${AMARELO}Hostname${RESET} (Identificação do Agente)"
@@ -5523,96 +6051,119 @@ EOF
 
             echo -e "${AMARELO}1. CacheSize${RESET} (Limites: 128K-64G | Padrão Zabbix: 32M)"
             echo -e "   Tamanho da memória partilhada para manter configurações de hosts e itens."
-            read -rp "   Valor Recomendado [${T_CACHE}]: " _v; T_CACHE=${_v:-$T_CACHE}
+            read -rp "   Valor Recomendado [${T_CACHE}]: " _v
+            T_CACHE=${_v:-$T_CACHE}
 
             echo -e "\n${AMARELO}2. StartDBSyncers${RESET} (Limites: 1-100 | Padrão Zabbix: 4)"
             echo -e "   Número de instâncias que sincronizam ativamente a memória com a Base de Dados."
-            read -rp "   Valor Recomendado [${T_DBSYNC}]: " _v; T_DBSYNC=${_v:-$T_DBSYNC}
+            read -rp "   Valor Recomendado [${T_DBSYNC}]: " _v
+            T_DBSYNC=${_v:-$T_DBSYNC}
 
             echo -e "\n${AMARELO}3. HistoryCacheSize${RESET} (Limites: 128K-16G | Padrão Zabbix: 16M)"
             echo -e "   Tamanho da memória partilhada para guardar métricas recentes antes de escrever no disco."
-            read -rp "   Valor Recomendado [${T_HCACHE}]: " _v; T_HCACHE=${_v:-$T_HCACHE}
+            read -rp "   Valor Recomendado [${T_HCACHE}]: " _v
+            T_HCACHE=${_v:-$T_HCACHE}
 
             echo -e "\n${AMARELO}4. HistoryIndexCacheSize${RESET} (Limites: 128K-16G | Padrão Zabbix: 4M)"
             echo -e "   Memória partilhada dedicada à indexação do histórico, que agiliza muito a procura."
-            read -rp "   Valor Recomendado [${T_HICACHE}]: " _v; T_HICACHE=${_v:-$T_HICACHE}
+            read -rp "   Valor Recomendado [${T_HICACHE}]: " _v
+            T_HICACHE=${_v:-$T_HICACHE}
 
             echo -e "\n${AMARELO}5. Timeout${RESET} (Limites: 1-30 | Padrão Zabbix: 3)"
             echo -e "   Tempo máximo em segundos que o Proxy espera por respostas de rede ou agentes."
-            read -rp "   Valor Recomendado [4]: " T_TOUT; T_TOUT=${T_TOUT:-4}
+            read -rp "   Valor Recomendado [4]: " T_TOUT
+            T_TOUT=${T_TOUT:-4}
 
             echo -e "\n${AMARELO}6. UnreachablePeriod${RESET} (Limites: 1-3600 | Padrão Zabbix: 45)"
             echo -e "   Segundos sem resposta até o Zabbix considerar que um host está incontactável."
-            read -rp "   Valor Recomendado [45]: " T_UNREACH; T_UNREACH=${T_UNREACH:-45}
+            read -rp "   Valor Recomendado [45]: " T_UNREACH
+            T_UNREACH=${T_UNREACH:-45}
 
             echo -e "\n${AMARELO}7. StartPingers${RESET} (Limites: 0-1000 | Padrão Zabbix: 1)"
             echo -e "   Número de processos em background que efetuam exclusivamente testes de ICMP (Ping)."
-            read -rp "   Valor Recomendado [5]: " T_PING; T_PING=${T_PING:-5}
+            read -rp "   Valor Recomendado [5]: " T_PING
+            T_PING=${T_PING:-5}
 
             echo -e "\n${AMARELO}8. StartDiscoverers${RESET} (Limites: 0-1000 | Padrão Zabbix: 5)"
             echo -e "   Número de processos dedicados à pesquisa (Discovery) na rede."
-            read -rp "   Valor Recomendado [5]: " T_DISC; T_DISC=${T_DISC:-5}
+            read -rp "   Valor Recomendado [5]: " T_DISC
+            T_DISC=${T_DISC:-5}
 
             echo -e "\n${AMARELO}9. StartHTTPPollers${RESET} (Limites: 0-1000 | Padrão Zabbix: 1)"
             echo -e "   Número de processos dedicados a recolhas e testes de cenários Web HTTP."
-            read -rp "   Valor Recomendado [1]: " T_HTTP; T_HTTP=${T_HTTP:-1}
+            read -rp "   Valor Recomendado [1]: " T_HTTP
+            T_HTTP=${T_HTTP:-1}
 
             echo -e "\n${AMARELO}10. StartPreprocessors${RESET} (Limites: 1-1000 | Padrão Zabbix: 16)"
             echo -e "   Threads focadas em converter, calcular e processar dados brutos antes da cache."
-            read -rp "   Valor Recomendado [${T_PREPROC}]: " _v; T_PREPROC=${_v:-$T_PREPROC}
+            read -rp "   Valor Recomendado [${T_PREPROC}]: " _v
+            T_PREPROC=${_v:-$T_PREPROC}
 
             echo -e "\n${AMARELO}11. StartPollersUnreachable${RESET} (Limites: 0-1000 | Padrão Zabbix: 1)"
             echo -e "   Coletores passivos destacados só para equipamentos em estado 'caído', evitando atrasar os saudáveis."
-            read -rp "   Valor Recomendado [5]: " T_PUNREACH; T_PUNREACH=${T_PUNREACH:-5}
+            read -rp "   Valor Recomendado [5]: " T_PUNREACH
+            T_PUNREACH=${T_PUNREACH:-5}
 
             echo -e "\n${AMARELO}12. StartTrappers${RESET} (Limites: 0-1000 | Padrão Zabbix: 5)"
             echo -e "   Processos dedicados a receber fluxos de Agentes Ativos e do Zabbix Sender."
-            read -rp "   Valor Recomendado [5]: " T_TRAP; T_TRAP=${T_TRAP:-5}
+            read -rp "   Valor Recomendado [5]: " T_TRAP
+            T_TRAP=${T_TRAP:-5}
 
             echo -e "\n${AMARELO}13. StartPollers${RESET} (Limites: 0-1000 | Padrão Zabbix: 5)"
             echo -e "   Coletores passivos genéricos (adequados para Zabbix Agent 1 e scripts comuns)."
-            read -rp "   Valor Recomendado [${T_POLL}]: " _v; T_POLL=${_v:-$T_POLL}
+            read -rp "   Valor Recomendado [${T_POLL}]: " _v
+            T_POLL=${_v:-$T_POLL}
 
             echo -e "\n${AMARELO}14. StartAgentPollers${RESET} (Limites: 0-1000 | Padrão Zabbix: 1)"
             echo -e "   Coletores assíncronos modernos de alta concorrência para o Zabbix Agent."
-            read -rp "   Valor Recomendado [1]: " T_APOLL; T_APOLL=${T_APOLL:-1}
+            read -rp "   Valor Recomendado [1]: " T_APOLL
+            T_APOLL=${T_APOLL:-1}
 
             echo -e "\n${AMARELO}15. StartHTTPAgentPollers${RESET} (Limites: 0-1000 | Padrão Zabbix: 1)"
             echo -e "   Coletores assíncronos de alta concorrência para o HTTP Agent."
-            read -rp "   Valor Recomendado [1]: " T_HAPOLL; T_HAPOLL=${T_HAPOLL:-1}
+            read -rp "   Valor Recomendado [1]: " T_HAPOLL
+            T_HAPOLL=${T_HAPOLL:-1}
 
             echo -e "\n${AMARELO}16. StartSNMPPollers${RESET} (Limites: 0-1000 | Padrão Zabbix: 1)"
             echo -e "   Coletores assíncronos de altíssima eficiência dedicados a queries de SNMP."
-            read -rp "   Valor Recomendado [10]: " T_SPOLL; T_SPOLL=${T_SPOLL:-10}
+            read -rp "   Valor Recomendado [10]: " T_SPOLL
+            T_SPOLL=${T_SPOLL:-10}
 
             echo -e "\n${AMARELO}17. StartBrowserPollers${RESET} (Limites: 0-1000 | Padrão Zabbix: 1)"
             echo -e "   Coletores assíncronos dedicados a itens de monitorização via Browser (Zabbix 7.0+)."
-            read -rp "   Valor Recomendado [1]: " T_BPOLL; T_BPOLL=${T_BPOLL:-1}
+            read -rp "   Valor Recomendado [1]: " T_BPOLL
+            T_BPOLL=${T_BPOLL:-1}
 
             echo -e "\n${AMARELO}18. StartODBCPollers${RESET} (Limites: 0-1000 | Padrão Zabbix: 1)"
             echo -e "   Coletores dedicados a itens de Base de Dados via ODBC (DB Monitor)."
-            read -rp "   Valor Recomendado [1]: " T_ODBCPOLL; T_ODBCPOLL=${T_ODBCPOLL:-1}
+            read -rp "   Valor Recomendado [1]: " T_ODBCPOLL
+            T_ODBCPOLL=${T_ODBCPOLL:-1}
 
             echo -e "\n${AMARELO}19. MaxConcurrentChecksPerPoller${RESET} (Limites: 1-1000 | Padrão Zabbix: 1000)"
             echo -e "   Número máximo de métricas que UM único poller assíncrono consegue processar a cada ciclo."
-            read -rp "   Valor Recomendado [1000]: " T_MAXC; T_MAXC=${T_MAXC:-1000}
+            read -rp "   Valor Recomendado [1000]: " T_MAXC
+            T_MAXC=${T_MAXC:-1000}
 
             echo -e "\n${AMARELO}20. ProxyConfigFrequency${RESET} (Limites: 1-604800 | Padrão Zabbix: 10)"
             echo -e "   Intervalo em segundos para que o Proxy (Ativo) descarregue configurações novas do Server."
-            read -rp "   Valor Recomendado [10]: " T_CFG_FREQ; T_CFG_FREQ=${T_CFG_FREQ:-10}
+            read -rp "   Valor Recomendado [10]: " T_CFG_FREQ
+            T_CFG_FREQ=${T_CFG_FREQ:-10}
 
             echo -e "\n${AMARELO}21. DataSenderFrequency${RESET} (Limites: 1-3600 | Padrão Zabbix: 1)"
             echo -e "   Intervalo em segundos para que o Proxy (Ativo) envie os seus dados para o Server."
-            read -rp "   Valor Recomendado [1]: " T_SND_FREQ; T_SND_FREQ=${T_SND_FREQ:-1}
+            read -rp "   Valor Recomendado [1]: " T_SND_FREQ
+            T_SND_FREQ=${T_SND_FREQ:-1}
 
             echo -e "\n${AMARELO}22. ProxyOfflineBuffer${RESET} (Limites: 1-720 | Padrão Zabbix: 1)"
             echo -e "   Mantém os dados acumulados durante N 'Horas' caso a ligação ao Zabbix Server falhe."
-            read -rp "   Valor Recomendado [1]: " T_OFFLINE; T_OFFLINE=${T_OFFLINE:-1}
+            read -rp "   Valor Recomendado [1]: " T_OFFLINE
+            T_OFFLINE=${T_OFFLINE:-1}
 
             echo -e "\n${AMARELO}23. ProxyBufferMode${RESET} (Opções: disk, memory, hybrid | Padrão Zabbix: disk)"
             echo -e "   Motor de cache. A opção 'hybrid' aproveita a RAM para aceleração bruta e descarrega no disco se encher."
             while true; do
-                read -rp "   Valor Recomendado [hybrid]: " T_BUF_MOD; T_BUF_MOD=${T_BUF_MOD:-hybrid}
+                read -rp "   Valor Recomendado [hybrid]: " T_BUF_MOD
+                T_BUF_MOD=${T_BUF_MOD:-hybrid}
                 [[ "$T_BUF_MOD" =~ ^(disk|memory|hybrid)$ ]] && break
                 echo "  Escolha 'disk', 'memory' ou 'hybrid'."
             done
@@ -5620,11 +6171,13 @@ EOF
             if [[ "$T_BUF_MOD" == "memory" || "$T_BUF_MOD" == "hybrid" ]]; then
                 echo -e "\n${AMARELO}24. ProxyMemoryBufferSize${RESET} (Limites: 0, 128K-2G | Padrão Zabbix: 0)"
                 echo -e "   Tamanho fixo da memória RAM alocada ao buffer (Modo Memory/Hybrid)."
-                read -rp "   Valor Recomendado [16M]: " T_BUF_SZ; T_BUF_SZ=${T_BUF_SZ:-16M}
+                read -rp "   Valor Recomendado [16M]: " T_BUF_SZ
+                T_BUF_SZ=${T_BUF_SZ:-16M}
 
                 echo -e "\n${AMARELO}25. ProxyMemoryBufferAge${RESET} (Limites: 0, 600-864000 | Padrão Zabbix: 0)"
                 echo -e "   Tempo limite (em segundos) que a cache fica na RAM antes de ser forçada para a BD."
-                read -rp "   Valor Recomendado [0]: " T_BUF_AGE; T_BUF_AGE=${T_BUF_AGE:-0}
+                read -rp "   Valor Recomendado [0]: " T_BUF_AGE
+                T_BUF_AGE=${T_BUF_AGE:-0}
             fi
             validate_size "$T_CACHE" "CacheSize"
             validate_int_range "$T_DBSYNC" "StartDBSyncers" 1 100
@@ -5660,7 +6213,15 @@ EOF
         echo -e "   ${VERDE}Fuso configurado: ${NEGRITO}${PROXY_TIMEZONE}${RESET}"
     }
 
-    m_clean; m_update; m_version; m_proxy_mode; m_proxy_net; m_agent; m_security; m_tuning; m_timezone
+    m_clean
+    m_update
+    m_version
+    m_proxy_mode
+    m_proxy_net
+    m_agent
+    m_security
+    m_tuning
+    m_timezone
 
     # Menu de revisão
     while true; do
@@ -5685,10 +6246,14 @@ EOF
         echo -e "${CIANO}------------------------------------------------------------${RESET}"
         read -rp "Insira o número da secção a alterar ou 0 para executar: " rev_opt
         case $rev_opt in
-            2) m_update ;; 3) m_version ;; 4) m_proxy_mode ;; 5|6) m_proxy_net ;;
-            7) m_agent ;; 8|9) m_security ;; 10|11) m_tuning ;;
-            12) m_timezone ;;
-            13) echo -e "${VERMELHO}Instalação abortada pelo utilizador.${RESET}"; exit 1 ;; 0) break ;;
+        2) m_update ;; 3) m_version ;; 4) m_proxy_mode ;; 5 | 6) m_proxy_net ;;
+        7) m_agent ;; 8 | 9) m_security ;; 10 | 11) m_tuning ;;
+        12) m_timezone ;;
+        13)
+            echo -e "${VERMELHO}Instalação abortada pelo utilizador.${RESET}"
+            exit 1
+            ;;
+        0) break ;;
         esac
     done
 
@@ -5697,13 +6262,14 @@ EOF
     validate_compatibility_matrix "proxy"
     echo -e "\n${CIANO}${NEGRITO}A processar pipeline... Não cancele a operação!${RESET}\n"
     preflight_install_check "proxy" 2048 1024
-    TOTAL_STEPS=15  # +1 para apt-mark hold
-    [[ "$CLEAN_INSTALL" == "1" ]] && TOTAL_STEPS=$(( TOTAL_STEPS + 3 ))
-    [[ "$UPDATE_SYSTEM" == "1" ]] && TOTAL_STEPS=$(( TOTAL_STEPS + 1 ))
-    [[ "$INSTALL_AGENT" == "1" ]] && TOTAL_STEPS=$(( TOTAL_STEPS + 1 ))
-    [[ "$USE_PSK" == "1" ]]       && TOTAL_STEPS=$(( TOTAL_STEPS + 1 ))
-    _IS_CONTAINER=0; systemd-detect-virt -c -q 2>/dev/null && _IS_CONTAINER=1 || true
-    [[ "$_IS_CONTAINER" == "0" ]] && TOTAL_STEPS=$(( TOTAL_STEPS + 2 ))  # timedatectl + NTP
+    TOTAL_STEPS=15 # +1 para apt-mark hold
+    [[ "$CLEAN_INSTALL" == "1" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 3))
+    [[ "$UPDATE_SYSTEM" == "1" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 1))
+    [[ "$INSTALL_AGENT" == "1" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 1))
+    [[ "$USE_PSK" == "1" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 1))
+    _IS_CONTAINER=0
+    systemd-detect-virt -c -q 2>/dev/null && _IS_CONTAINER=1 || true
+    [[ "$_IS_CONTAINER" == "0" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 2)) # timedatectl + NTP
     [[ "$SIMULATE_MODE" == "1" ]] && echo -e "\n${CIANO}${NEGRITO}SIMULAÇÃO DO PIPELINE — PROXY${RESET}\n"
 
     if [[ "$CLEAN_INSTALL" == "1" ]]; then
@@ -5793,46 +6359,46 @@ EOF
 
     apply_logic() {
         set_config "$PX_F" "ProxyMode" "$PROXY_MODE"
-        set_config "$PX_F" "Server"    "$ZBX_SERVER"
-        set_config "$PX_F" "Hostname"  "$ZBX_HOSTNAME"
-        set_config "$PX_F" "DBName"    "/var/lib/zabbix/zabbix_proxy.db"
-        set_config "$PX_F" "LogType"   "file"
-        set_config "$PX_F" "LogFile"   "/var/log/zabbix/zabbix_proxy.log"
+        set_config "$PX_F" "Server" "$ZBX_SERVER"
+        set_config "$PX_F" "Hostname" "$ZBX_HOSTNAME"
+        set_config "$PX_F" "DBName" "/var/lib/zabbix/zabbix_proxy.db"
+        set_config "$PX_F" "LogType" "file"
+        set_config "$PX_F" "LogFile" "/var/log/zabbix/zabbix_proxy.log"
         set_config "$PX_F" "EnableRemoteCommands" ""
         set_config "$PX_F" "AllowKey" ""
-        set_config "$PX_F" "CacheSize"        "$T_CACHE"
-        set_config "$PX_F" "StartDBSyncers"   "$T_DBSYNC"
+        set_config "$PX_F" "CacheSize" "$T_CACHE"
+        set_config "$PX_F" "StartDBSyncers" "$T_DBSYNC"
         set_config "$PX_F" "HistoryCacheSize" "$T_HCACHE"
-        set_config "$PX_F" "StartPollers"     "$T_POLL"
+        set_config "$PX_F" "StartPollers" "$T_POLL"
         set_config "$PX_F" "StartPreprocessors" "$T_PREPROC"
         if [[ "$USE_TUNING" == "1" ]]; then
-            set_config "$PX_F" "HistoryIndexCacheSize"        "$T_HICACHE"
-            set_config "$PX_F" "Timeout"                      "$T_TOUT"
-            set_config "$PX_F" "UnreachablePeriod"            "$T_UNREACH"
-            set_config "$PX_F" "StartPingers"                 "$T_PING"
-            set_config "$PX_F" "StartDiscoverers"             "$T_DISC"
-            set_config "$PX_F" "StartHTTPPollers"             "$T_HTTP"
-            set_config "$PX_F" "StartPollersUnreachable"      "$T_PUNREACH"
-            set_config "$PX_F" "StartTrappers"                "$T_TRAP"
-            set_config "$PX_F" "StartAgentPollers"            "$T_APOLL"
-            set_config "$PX_F" "StartHTTPAgentPollers"        "$T_HAPOLL"
-            set_config "$PX_F" "StartSNMPPollers"             "$T_SPOLL"
-            set_config "$PX_F" "StartBrowserPollers"          "$T_BPOLL"
-            set_config "$PX_F" "StartODBCPollers"             "$T_ODBCPOLL"
+            set_config "$PX_F" "HistoryIndexCacheSize" "$T_HICACHE"
+            set_config "$PX_F" "Timeout" "$T_TOUT"
+            set_config "$PX_F" "UnreachablePeriod" "$T_UNREACH"
+            set_config "$PX_F" "StartPingers" "$T_PING"
+            set_config "$PX_F" "StartDiscoverers" "$T_DISC"
+            set_config "$PX_F" "StartHTTPPollers" "$T_HTTP"
+            set_config "$PX_F" "StartPollersUnreachable" "$T_PUNREACH"
+            set_config "$PX_F" "StartTrappers" "$T_TRAP"
+            set_config "$PX_F" "StartAgentPollers" "$T_APOLL"
+            set_config "$PX_F" "StartHTTPAgentPollers" "$T_HAPOLL"
+            set_config "$PX_F" "StartSNMPPollers" "$T_SPOLL"
+            set_config "$PX_F" "StartBrowserPollers" "$T_BPOLL"
+            set_config "$PX_F" "StartODBCPollers" "$T_ODBCPOLL"
             set_config "$PX_F" "MaxConcurrentChecksPerPoller" "$T_MAXC"
-            set_config "$PX_F" "ProxyConfigFrequency"         "$T_CFG_FREQ"
-            set_config "$PX_F" "DataSenderFrequency"          "$T_SND_FREQ"
-            set_config "$PX_F" "ProxyOfflineBuffer"           "$T_OFFLINE"
-            set_config "$PX_F" "ProxyBufferMode"              "$T_BUF_MOD"
+            set_config "$PX_F" "ProxyConfigFrequency" "$T_CFG_FREQ"
+            set_config "$PX_F" "DataSenderFrequency" "$T_SND_FREQ"
+            set_config "$PX_F" "ProxyOfflineBuffer" "$T_OFFLINE"
+            set_config "$PX_F" "ProxyBufferMode" "$T_BUF_MOD"
             if [[ "$T_BUF_MOD" == "hybrid" || "$T_BUF_MOD" == "memory" ]]; then
                 set_config "$PX_F" "ProxyMemoryBufferSize" "$T_BUF_SZ"
-                set_config "$PX_F" "ProxyMemoryBufferAge"  "$T_BUF_AGE"
+                set_config "$PX_F" "ProxyMemoryBufferAge" "$T_BUF_AGE"
             fi
         fi
         if [[ -f "$AG_F" && "$INSTALL_AGENT" == "1" ]]; then
-            set_config "$AG_F" "Server"       "$AG_SERVER"
+            set_config "$AG_F" "Server" "$AG_SERVER"
             set_config "$AG_F" "ServerActive" "$AG_SERVER_ACTIVE"
-            set_config "$AG_F" "Hostname"     "$AG_HOSTNAME"
+            set_config "$AG_F" "Hostname" "$AG_HOSTNAME"
             [[ "$AG_ALLOWKEY" == "1" ]] && set_config "$AG_F" "AllowKey" "system.run[*]"
         fi
     }
@@ -5845,7 +6411,7 @@ EOF
             PSK_PROXY_KEY=$(openssl rand -hex 32)
         fi
         if [[ "$SIMULATE_MODE" != "1" ]]; then
-            echo "$PSK_PROXY_KEY" > /etc/zabbix/zabbix_proxy.psk
+            echo "$PSK_PROXY_KEY" >/etc/zabbix/zabbix_proxy.psk
             chown zabbix:zabbix /etc/zabbix/zabbix_proxy.psk
             chmod 600 /etc/zabbix/zabbix_proxy.psk
         fi
@@ -5856,21 +6422,21 @@ EOF
                 PSK_AGENT_KEY=$(openssl rand -hex 32)
             fi
             if [[ "$SIMULATE_MODE" != "1" ]]; then
-                echo "$PSK_AGENT_KEY" > /etc/zabbix/zabbix_agent2.psk
+                echo "$PSK_AGENT_KEY" >/etc/zabbix/zabbix_agent2.psk
                 chown zabbix:zabbix /etc/zabbix/zabbix_agent2.psk
                 chmod 600 /etc/zabbix/zabbix_agent2.psk
             fi
         fi
         apply_psk() {
-            set_config "$PX_F" "TLSAccept"      "psk"
+            set_config "$PX_F" "TLSAccept" "psk"
             [[ "$PROXY_MODE" == "0" ]] && set_config "$PX_F" "TLSConnect" "psk"
             set_config "$PX_F" "TLSPSKIdentity" "$PSK_PROXY_ID"
-            set_config "$PX_F" "TLSPSKFile"     "/etc/zabbix/zabbix_proxy.psk"
+            set_config "$PX_F" "TLSPSKFile" "/etc/zabbix/zabbix_proxy.psk"
             if [[ -f "$AG_F" && "$INSTALL_AGENT" == "1" ]]; then
-                set_config "$AG_F" "TLSAccept"      "psk"
-                set_config "$AG_F" "TLSConnect"     "psk"
+                set_config "$AG_F" "TLSAccept" "psk"
+                set_config "$AG_F" "TLSConnect" "psk"
                 set_config "$AG_F" "TLSPSKIdentity" "$PSK_AGENT_ID"
-                set_config "$AG_F" "TLSPSKFile"     "/etc/zabbix/zabbix_agent2.psk"
+                set_config "$AG_F" "TLSPSKFile" "/etc/zabbix/zabbix_agent2.psk"
             fi
         }
         run_step "Gerando e aplicando chaves PSK independentes" apply_psk
@@ -5910,22 +6476,26 @@ EOF
     [[ "$SIMULATE_MODE" == "1" ]] && finish_simulation
     post_validate_installation "proxy"
     if [[ "$_CRITICAL_SERVICES_OK" == "1" ]]; then
-        CURRENT_STEP=$TOTAL_STEPS; draw_progress "Instalação Perfeita! ✔"; printf "\n"
+        CURRENT_STEP=$TOTAL_STEPS
+        draw_progress "Instalação Perfeita! ✔"
+        printf "\n"
     else
-        CURRENT_STEP=$TOTAL_STEPS; draw_progress "Instalação com Avisos ⚠"; printf "\n"
+        CURRENT_STEP=$TOTAL_STEPS
+        draw_progress "Instalação com Avisos ⚠"
+        printf "\n"
     fi
 
     # Certificado
     clear
     start_certificate_export "proxy"
-    [[ "$_CRITICAL_SERVICES_OK" != "1" ]] && \
+    [[ "$_CRITICAL_SERVICES_OK" != "1" ]] &&
         echo -e "${VERMELHO}${NEGRITO}⚠ UM OU MAIS SERVIÇOS CRÍTICOS NÃO ESTÃO ATIVOS. Verifique acima e execute: journalctl -xe --no-pager${RESET}\n"
     echo -e "${VERDE}${NEGRITO}╔══════════════════════════════════════════════════════════╗${RESET}"
     echo -e "${VERDE}${NEGRITO}║                CERTIFICADO DE IMPLANTAÇÃO                ║${RESET}"
     echo -e "${VERDE}${NEGRITO}╚══════════════════════════════════════════════════════════╝${RESET}"
     echo -e "\n${CIANO}${NEGRITO}▸ INFO DO SISTEMA OPERACIONAL${RESET}"
-    command -v lsb_release >/dev/null 2>&1 && \
-        printf "  %-34s %s\n" "Distribuição:" "$(lsb_release -ds)" || \
+    command -v lsb_release >/dev/null 2>&1 &&
+        printf "  %-34s %s\n" "Distribuição:" "$(lsb_release -ds)" ||
         printf "  %-34s %s\n" "Sistema:" "$OS_DISPLAY"
     printf "  %-34s %s\n" "Kernel:" "$(uname -r)"
     printf "  %-34s %s\n" "Arquitetura:" "$(uname -m)"
@@ -5948,12 +6518,12 @@ EOF
         printf "  %-34s %s\n" "zabbix-agent2:" "${AG_PKG_VER:-N/D}"
     fi
     echo -e "\n${CIANO}${NEGRITO}▸ ESTADO DOS SERVIÇOS${RESET}"
-    systemctl is-active --quiet zabbix-proxy && \
-        printf "  %-34s ${VERDE}%s${RESET}\n" "zabbix-proxy:" "ATIVO ✔" || \
+    systemctl is-active --quiet zabbix-proxy &&
+        printf "  %-34s ${VERDE}%s${RESET}\n" "zabbix-proxy:" "ATIVO ✔" ||
         printf "  %-34s ${VERMELHO}%s${RESET}\n" "zabbix-proxy:" "FALHOU ✖"
     if [[ "$INSTALL_AGENT" == "1" ]]; then
-        systemctl is-active --quiet zabbix-agent2 && \
-            printf "  %-34s ${VERDE}%s${RESET}\n" "zabbix-agent2:" "ATIVO ✔" || \
+        systemctl is-active --quiet zabbix-agent2 &&
+            printf "  %-34s ${VERDE}%s${RESET}\n" "zabbix-agent2:" "ATIVO ✔" ||
             printf "  %-34s ${VERMELHO}%s${RESET}\n" "zabbix-agent2:" "FALHOU ✖"
     fi
     echo -e "\n${CIANO}${NEGRITO}▸ AUDITORIA: LINHAS ATIVAS NO PROXY ($PX_F)${RESET}"
@@ -5966,15 +6536,15 @@ EOF
         echo -e "\n${AMARELO}${NEGRITO}▸ CREDENCIAIS PSK PARA O FRONTEND${RESET}"
         echo -e "  ------------------------------------------------------------"
         echo -e "  ${VERDE}[ ZABBIX PROXY ]${RESET}"
-        printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "IP:"         "$HOST_IP"
-        printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Hostname:"   "$ZBX_HOSTNAME"
-        printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Identity:"   "$PSK_PROXY_ID"
+        printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "IP:" "$HOST_IP"
+        printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Hostname:" "$ZBX_HOSTNAME"
+        printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Identity:" "$PSK_PROXY_ID"
         printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Secret Key:" "$PSK_PROXY_KEY"
         if [[ "$INSTALL_AGENT" == "1" ]]; then
             echo -e "\n  ${VERDE}[ ZABBIX AGENT 2 ]${RESET}"
-            printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "IP:"         "$HOST_IP"
-            printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Hostname:"   "$AG_HOSTNAME"
-            printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Identity:"   "$PSK_AGENT_ID"
+            printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "IP:" "$HOST_IP"
+            printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Hostname:" "$AG_HOSTNAME"
+            printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Identity:" "$PSK_AGENT_ID"
             printf "  ${NEGRITO}%-32s${RESET} ${CIANO}%s${RESET}\n" "Secret Key:" "$PSK_AGENT_KEY"
         fi
         echo -e "  ------------------------------------------------------------"
