@@ -1317,7 +1317,7 @@ write_install_summary_json() {
 
 doctor_show_last_installer_version() {
     local cert="/root/zabbix_install_summary_plain.txt"
-    local hist latest installer
+    local latest installer
     echo -e "\n${CIANO}${NEGRITO}▸ ÚLTIMO CERTIFICADO SALVO${RESET}"
     if [[ -f "$cert" ]]; then
         installer=$(awk -F: '/Instalador:/{sub(/^[[:space:]]+/, "", $2); print $2; exit}' "$cert" 2>/dev/null || true)
