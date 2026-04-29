@@ -37,6 +37,7 @@ detect_distro() {
 
     U_VER="${DISTRO_VERSION}"
     U_CODENAME="${DISTRO_CODENAME}"
+    # shellcheck disable=SC2034
     OS_ID="${DISTRO_ID}"
 
     case "$DISTRO_ID" in

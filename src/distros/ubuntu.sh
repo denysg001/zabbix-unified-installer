@@ -4,6 +4,7 @@
 # Future distro ports should add src/distros/<name>.sh with package names,
 # service names, repository URLs, and config paths that differ by platform.
 
+# shellcheck disable=SC2034
 UBUNTU_APT_BASE_PACKAGES=(
     curl
     wget
@@ -15,11 +16,17 @@ UBUNTU_APT_BASE_PACKAGES=(
     python3
 )
 
+# shellcheck disable=SC2034
 UBUNTU_SERVICE_POSTGRESQL="postgresql"
+# shellcheck disable=SC2034
 UBUNTU_SERVICE_ZABBIX_SERVER="zabbix-server"
+# shellcheck disable=SC2034
 UBUNTU_SERVICE_ZABBIX_PROXY="zabbix-proxy"
+# shellcheck disable=SC2034
 UBUNTU_SERVICE_ZABBIX_AGENT2="zabbix-agent2"
+# shellcheck disable=SC2034
 UBUNTU_SERVICE_NGINX="nginx"
+# shellcheck disable=SC2034
 UBUNTU_SERVICE_PHP_FPM_PREFIX="php"
 
 ubuntu_php_version_for_release() {
