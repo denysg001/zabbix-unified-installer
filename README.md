@@ -10,6 +10,8 @@ Instalador unificado e resiliente para Zabbix Database, Server e Proxy, com flux
 
 ## O Que Ele Faz
 
+![Status do projeto](docs/assets/features-status.png)
+
 - Instala Zabbix Database com PostgreSQL e TimescaleDB opcional.
 - Instala Zabbix Server com frontend, Nginx, PHP-FPM e schema PostgreSQL.
 - Instala Zabbix Proxy com SQLite e Agent 2 opcional.
