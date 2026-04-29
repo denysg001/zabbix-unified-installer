@@ -801,7 +801,11 @@ run_step() {
         is_apt=1
     fi
     local max_retries count=0 success=0
-    max_retries=$([[ $is_apt -eq 1 ]] && echo 3 || echo 1)
+    if [[ "$is_apt" -eq 1 ]]; then
+        max_retries=3
+    else
+        max_retries=1
+    fi
     while [ $count -lt $max_retries ]; do
         draw_progress "$msg"
         if "$@" >>"$LOG_FILE" 2>&1; then success=1; break
@@ -2614,7 +2618,7 @@ show_dry_run_plan() {
 finish_simulation() {
     CURRENT_STEP=$TOTAL_STEPS
     draw_progress "Simulação concluída ✔"
-    printf "\n\n${VERDE}${NEGRITO}Simulação concluída. Nada foi instalado, removido ou alterado.${RESET}\n"
+    printf '\n\n%bSimulação concluída. Nada foi instalado, removido ou alterado.%b\n' "${VERDE}${NEGRITO}" "$RESET"
     exit 0
 }
 
@@ -2793,7 +2797,12 @@ run_doctor_mode() {
             validate_service_active nginx
             local php_svc
             php_svc=$(safe_diag_cmd systemctl list-units 'php*-fpm.service' --no-legend --no-pager | awk '{print $1}' | head -1 || true)
-            [[ -n "$php_svc" ]] && validate_service_active "${php_svc%.service}" || { echo -e "  ${AMARELO}⚠ Serviço php-fpm não detectado.${RESET}"; DOCTOR_WARN=$(( DOCTOR_WARN + 1 )); }
+            if [[ -n "$php_svc" ]]; then
+                validate_service_active "${php_svc%.service}"
+            else
+                echo -e "  ${AMARELO}⚠ Serviço php-fpm não detectado.${RESET}"
+                DOCTOR_WARN=$(( DOCTOR_WARN + 1 ))
+            fi
             check_tcp_listen 10051 "Zabbix Server"
             NGINX_PORT=$(timeout 10 awk '/^[[:space:]]*listen[[:space:]]+[0-9]+/ { for (i=1;i<=NF;i++) if ($i ~ /^[0-9]+/) { gsub(/[^0-9]/,"",$i); print $i; exit } }' /etc/zabbix/nginx.conf 2>/dev/null || true)
             NGINX_PORT="${NGINX_PORT:-80}"
